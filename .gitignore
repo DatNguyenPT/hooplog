@@ -43,7 +43,7 @@ example
 /android
 
 # footage and datasets (never commit)
-data/
+/data/
 *.mp4
 *.mov
 
