@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "16000"
+  },
+  "bashOutputMaxChars": 12000,
+  "autoCompactWindow": 200000,
+  "permissions": {
+    "allow": [
+      "Bash(node tools/loopctl.mjs status)",
+      "Bash(node tools/harness-lint.mjs)",
+      "Bash(node tools/pr-preflight.mjs)",
+      "Bash(node tools/postman-summary.mjs *)",
+      "Edit(.harness/state/summary.md)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.production)",
+      "Read(**/node_modules/**)",
+      "Read(**/dist/**)",
+      "Read(**/coverage/**)",
+      "Read(**/.next/**)",
+      "Read(**/*.min.js)",
+      "Read(**/*.map)",
+      "Read(**/*.log)",
+      "Read(**/package-lock.json)",
+      "Read(**/yarn.lock)",
+      "Read(**/pnpm-lock.yaml)",
+      "Read(.harness/cache/**)",
+      "Edit(.harness/state/loop.json)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session-context.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/loop-guard.mjs\"",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PROJECT_DIR}/.claude/hooks/loop-guard.mjs\"",
+            "timeout": 900
+          }
+        ]
+      }
+    ]
+  }
+}

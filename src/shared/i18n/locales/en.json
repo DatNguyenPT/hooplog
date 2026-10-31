@@ -1,0 +1,12 @@
+{
+  "common": { "loading": "Loading…", "error": "Something went wrong.", "retry": "Try again" },
+  "devCheck": {
+    "title": "HoopLog",
+    "subtitle": "Foundation check: storage works on this device.",
+    "made": "Made",
+    "missed": "Missed",
+    "fg": "FG%",
+    "fgEmpty": "No shots yet",
+    "shots": "{{count}} shots stored on this device"
+  }
+}
