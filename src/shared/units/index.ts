@@ -13,3 +13,18 @@ export function formatWeight(kg: number, system: UnitSystem = 'metric'): string 
   const value = system === 'metric' ? kg : kgToLb(kg);
   return `${Math.round(value * 10) / 10} ${system === 'metric' ? 'kg' : 'lb'}`;
 }
+
+/** Metres below 1 km, kilometres (one decimal at most) from 1 km up. */
+export function formatDistance(meters: number): string {
+  if (meters < 1000) return `${Math.round(meters * 10) / 10} m`;
+  return `${Math.round(meters / 100) / 10} km`;
+}
+
+/** `m:ss`, or `h:mm:ss` from one hour up. */
+export function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}

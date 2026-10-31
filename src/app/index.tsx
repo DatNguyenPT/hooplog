@@ -9,38 +9,61 @@ import {
   type SessionListItem,
 } from '@/features/shooting/data/shootingRepository';
 import { fieldGoalPercentage } from '@/features/shooting/domain/stats';
+import {
+  useWorkoutRepository,
+  type WorkoutListItem,
+} from '@/features/workouts/data/workoutRepository';
+import { WorkoutRow } from '@/features/workouts/ui/WorkoutRow';
 import { formatDateTime, formatPercent } from '@/shared/i18n/format';
 import { Button } from '@/shared/ui/Button';
 import { EmptyView, ErrorView, InlineError, LoadingView } from '@/shared/ui/StateViews';
 import { useTheme } from '@/shared/ui/theme';
 import { useLoad } from '@/shared/ui/useLoad';
 
-/** Home shows only the 50 most recent sessions; there is no paging yet (history screen comes later). */
+/** Home shows only the 50 most recent shooting sessions and workouts, each; there is no paging yet. */
 const RECENT_SESSION_LIMIT = 50;
+
+type Activity =
+  | { kind: 'shooting'; startedAt: string; item: SessionListItem }
+  | { kind: 'workout'; startedAt: string; item: WorkoutListItem };
 
 export default function Home() {
   const { t } = useTranslation();
   const theme = useTheme();
-  const repo = useShootingRepository();
+  const shooting = useShootingRepository();
+  const workouts = useWorkoutRepository();
 
   const load = useCallback(async () => {
-    const [sessions, activeId] = await Promise.all([
-      repo.listSessions(RECENT_SESSION_LIMIT),
-      repo.getActiveSessionId(),
+    const [sessions, workoutList, activeShootingId, activeWorkoutId] = await Promise.all([
+      shooting.listSessions(RECENT_SESSION_LIMIT),
+      workouts.listSessions(RECENT_SESSION_LIMIT),
+      shooting.getActiveSessionId(),
+      workouts.getActiveSessionId(),
     ]);
-    return { sessions, activeId };
-  }, [repo]);
+    // ISO-8601 UTC strings sort chronologically as plain strings.
+    const activity: Activity[] = [
+      ...sessions.map((item): Activity => ({ kind: 'shooting', startedAt: item.startedAt, item })),
+      ...workoutList.map((item): Activity => ({
+        kind: 'workout',
+        startedAt: item.startedAt,
+        item,
+      })),
+    ]
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+      .slice(0, RECENT_SESSION_LIMIT);
+    return { activity, activeShootingId, activeWorkoutId };
+  }, [shooting, workouts]);
   const { state, reload } = useLoad(load);
   const busy = useRef(false);
   const [startFailed, setStartFailed] = useState(false);
 
-  const start = async () => {
+  const start = async (begin: () => Promise<string>, kind: 'shooting' | 'workout') => {
     if (busy.current) return;
     busy.current = true;
     setStartFailed(false);
     try {
-      const id = await repo.startOrResumeSession();
-      router.push(`/shooting/${id}`);
+      const id = await begin();
+      router.push(kind === 'shooting' ? `/shooting/${id}` : `/workout/${id}`);
     } catch {
       setStartFailed(true);
       reload();
@@ -62,22 +85,33 @@ export default function Home() {
       ) : (
         <>
           <Button
-            label={state.data.activeId ? t('home.resumeShooting') : t('home.startShooting')}
-            onPress={start}
+            label={state.data.activeShootingId ? t('home.resumeShooting') : t('home.startShooting')}
+            onPress={() => start(shooting.startOrResumeSession, 'shooting')}
+            style={styles.cta}
+          />
+          <Button
+            label={state.data.activeWorkoutId ? t('home.resumeWorkout') : t('home.startWorkout')}
+            onPress={() => start(workouts.startOrResumeSession, 'workout')}
             style={styles.cta}
           />
           {startFailed ? <InlineError message={t('home.startError')} /> : null}
           <Text accessibilityRole="header" style={[styles.section, { color: theme.textMuted }]}>
             {t('home.recent')}
           </Text>
-          {state.data.sessions.length === 0 ? (
+          {state.data.activity.length === 0 ? (
             <EmptyView title={t('home.emptyTitle')} hint={t('home.emptyHint')} />
           ) : (
             <FlatList
-              data={state.data.sessions}
-              keyExtractor={(s) => s.id}
+              data={state.data.activity}
+              keyExtractor={(a) => `${a.kind}-${a.item.id}`}
               contentContainerStyle={styles.list}
-              renderItem={({ item }) => <SessionRow item={item} />}
+              renderItem={({ item }) =>
+                item.kind === 'shooting' ? (
+                  <SessionRow item={item.item} />
+                ) : (
+                  <WorkoutRow item={item.item} />
+                )
+              }
             />
           )}
         </>
@@ -112,7 +146,10 @@ function SessionRow({ item }: { item: SessionListItem }) {
             : t('home.sessionSummary', { made: item.made, attempts: item.attempts })}
         </Text>
       </View>
-      <Text style={[styles.rowFg, { color: theme.text }]}>{fg}</Text>
+      <View style={styles.side}>
+        <Text style={[styles.kind, { color: theme.textMuted }]}>{t('home.kindShooting')}</Text>
+        <Text style={[styles.rowFg, { color: theme.text }]}>{fg}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -120,7 +157,7 @@ function SessionRow({ item }: { item: SessionListItem }) {
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
   title: { fontSize: 32, fontWeight: '800', marginTop: 8, marginBottom: 16 },
-  cta: { minHeight: 64 },
+  cta: { minHeight: 64, marginBottom: 8 },
   section: { fontSize: 14, fontWeight: '700', marginTop: 24, marginBottom: 8 },
   list: { gap: 8, paddingBottom: 24 },
   row: {
@@ -133,5 +170,7 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1, gap: 2 },
   rowTitle: { fontSize: 16, fontWeight: '600' },
+  side: { alignItems: 'flex-end' },
+  kind: { fontSize: 12, fontWeight: '700' },
   rowFg: { fontSize: 24, fontWeight: '800' },
 });
