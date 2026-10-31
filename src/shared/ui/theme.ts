@@ -5,7 +5,7 @@ const light = {
   surface: '#f2f3f5',
   text: '#111418',
   textMuted: '#5b6470',
-  primary: '#e8590c',
+  primary: '#c2410c',
   onPrimary: '#ffffff',
   made: '#1b7a3a',
   missed: '#b3261e',

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,9 +11,12 @@ import {
 import { fieldGoalPercentage } from '@/features/shooting/domain/stats';
 import { formatDateTime, formatPercent } from '@/shared/i18n/format';
 import { Button } from '@/shared/ui/Button';
-import { EmptyView, ErrorView, LoadingView } from '@/shared/ui/StateViews';
+import { EmptyView, ErrorView, InlineError, LoadingView } from '@/shared/ui/StateViews';
 import { useTheme } from '@/shared/ui/theme';
 import { useLoad } from '@/shared/ui/useLoad';
+
+/** Home shows only the 50 most recent sessions; there is no paging yet (history screen comes later). */
+const RECENT_SESSION_LIMIT = 50;
 
 export default function Home() {
   const { t } = useTranslation();
@@ -22,19 +25,27 @@ export default function Home() {
 
   const load = useCallback(async () => {
     const [sessions, activeId] = await Promise.all([
-      repo.listSessions(50),
+      repo.listSessions(RECENT_SESSION_LIMIT),
       repo.getActiveSessionId(),
     ]);
     return { sessions, activeId };
   }, [repo]);
   const { state, reload } = useLoad(load);
+  const busy = useRef(false);
+  const [startFailed, setStartFailed] = useState(false);
 
   const start = async () => {
+    if (busy.current) return;
+    busy.current = true;
+    setStartFailed(false);
     try {
       const id = await repo.startOrResumeSession();
       router.push(`/shooting/${id}`);
     } catch {
+      setStartFailed(true);
       reload();
+    } finally {
+      busy.current = false;
     }
   };
 
@@ -55,6 +66,7 @@ export default function Home() {
             onPress={start}
             style={styles.cta}
           />
+          {startFailed ? <InlineError message={t('home.startError')} /> : null}
           <Text accessibilityRole="header" style={[styles.section, { color: theme.textMuted }]}>
             {t('home.recent')}
           </Text>
@@ -77,15 +89,16 @@ export default function Home() {
 function SessionRow({ item }: { item: SessionListItem }) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const attempts = item.made + item.missed;
   const fg = formatPercent(fieldGoalPercentage(item));
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${formatDateTime(item.startedAt)}, ${t('home.sessionSummary', {
+      accessibilityLabel={t('home.sessionRowLabel', {
+        date: formatDateTime(item.startedAt),
         made: item.made,
-        attempts,
-      })}, ${t('session.fg')} ${fg}`}
+        attempts: item.attempts,
+        fg,
+      })}
       onPress={() => router.push(`/shooting/${item.id}`)}
       style={[styles.row, { backgroundColor: theme.surface }]}
     >
@@ -96,7 +109,7 @@ function SessionRow({ item }: { item: SessionListItem }) {
         <Text style={{ color: theme.textMuted }}>
           {item.endedAt === null
             ? t('home.inProgress')
-            : t('home.sessionSummary', { made: item.made, attempts })}
+            : t('home.sessionSummary', { made: item.made, attempts: item.attempts })}
         </Text>
       </View>
       <Text style={[styles.rowFg, { color: theme.text }]}>{fg}</Text>

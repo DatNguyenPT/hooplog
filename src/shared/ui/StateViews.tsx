@@ -24,6 +24,15 @@ export function ErrorView({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+export function InlineError({ message }: { message: string }) {
+  const theme = useTheme();
+  return (
+    <Text accessibilityRole="alert" style={[styles.inline, { color: theme.missed }]}>
+      {message}
+    </Text>
+  );
+}
+
 export function EmptyView({ title, hint }: { title: string; hint?: string }) {
   const theme = useTheme();
   return (
@@ -36,5 +45,6 @@ export function EmptyView({ title, hint }: { title: string; hint?: string }) {
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, flex: 1 },
+  inline: { fontSize: 14, fontWeight: '600', paddingVertical: 8 },
   message: { fontSize: 18, fontWeight: '600', textAlign: 'center' },
 });

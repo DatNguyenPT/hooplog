@@ -30,6 +30,12 @@ export const migrations: Migration[] = [
   },
   {
     version: 2,
-    sql: `ALTER TABLE shooting_session ADD COLUMN ended_at TEXT;`,
+    sql: `
+      ALTER TABLE shooting_session ADD COLUMN ended_at TEXT;
+      -- Sessions created before ended_at existed (M0) are finished; close them so the unique index below can be built.
+      UPDATE shooting_session SET ended_at = updated_at WHERE ended_at IS NULL;
+      -- At most one open session, enforced by the database (guards against double taps and races).
+      CREATE UNIQUE INDEX idx_one_open_session ON shooting_session((1)) WHERE ended_at IS NULL AND deleted_at IS NULL;
+    `,
   },
 ];

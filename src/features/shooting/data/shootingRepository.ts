@@ -10,6 +10,8 @@ export type SessionListItem = {
   endedAt: string | null;
   made: number;
   missed: number;
+  /** Resolved attempts: made + missed. */
+  attempts: number;
 };
 
 export type SessionDetail = {
@@ -49,10 +51,17 @@ export function createShootingRepository(db: SQLiteDatabase): ShootingRepository
       if (existing) return existing;
       const id = newId();
       const now = nowIso();
-      await db.runAsync(
-        'INSERT INTO shooting_session (id, started_at, created_at, updated_at) VALUES (?, ?, ?, ?)',
-        [id, now, now, now],
-      );
+      try {
+        await db.runAsync(
+          'INSERT INTO shooting_session (id, started_at, created_at, updated_at) VALUES (?, ?, ?, ?)',
+          [id, now, now, now],
+        );
+      } catch (error) {
+        // A concurrent call won the race and the unique index (idx_one_open_session) rejected ours: resume theirs.
+        const winner = await getActiveSessionId();
+        if (winner) return winner;
+        throw error;
+      }
       return id;
     },
 
@@ -141,6 +150,7 @@ export function createShootingRepository(db: SQLiteDatabase): ShootingRepository
         endedAt: r.ended_at,
         made: r.made,
         missed: r.missed,
+        attempts: r.made + r.missed,
       }));
     },
   };

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,7 +8,7 @@ import { useShootingRepository } from '@/features/shooting/data/shootingReposito
 import { summarize, type ShotResult } from '@/features/shooting/domain/stats';
 import { formatDateTime, formatPercent } from '@/shared/i18n/format';
 import { Button } from '@/shared/ui/Button';
-import { EmptyView, ErrorView, LoadingView } from '@/shared/ui/StateViews';
+import { EmptyView, ErrorView, InlineError, LoadingView } from '@/shared/ui/StateViews';
 import { useTheme } from '@/shared/ui/theme';
 import { useLoad } from '@/shared/ui/useLoad';
 
@@ -21,13 +21,32 @@ export default function ShootingSession() {
   const load = useCallback(() => repo.getSession(id), [repo, id]);
   const { state, reload } = useLoad(load);
 
+  const [actionFailed, setActionFailed] = useState(false);
+
   const run = async (action: () => Promise<void>) => {
+    setActionFailed(false);
     try {
       await action();
+    } catch {
+      setActionFailed(true);
     } finally {
       reload();
     }
   };
+
+  const confirmEnd = (sessionId: string) =>
+    Alert.alert(t('session.endConfirmTitle'), t('session.endConfirmBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('session.end'),
+        style: 'destructive',
+        onPress: () =>
+          void run(async () => {
+            await repo.endSession(sessionId);
+            router.dismissTo('/');
+          }),
+      },
+    ]);
 
   const session = state.status === 'ready' ? state.data : null;
   const summary = useMemo(() => summarize(session?.results ?? []), [session]);
@@ -48,13 +67,15 @@ export default function ShootingSession() {
     return (
       <Screen>
         <EmptyView title={t('session.notFound')} />
-        <Button label={t('session.done')} onPress={() => router.replace('/')} />
+        <Button label={t('session.done')} onPress={() => router.dismissTo('/')} />
       </Screen>
     );
   }
 
   const active = session.endedAt === null;
   const recent = session.results.slice(-10).reverse();
+  const recentStart = session.results.length - recent.length;
+  const word = (r: ShotResult) => t(`session.${r}`);
 
   return (
     <Screen>
@@ -65,7 +86,11 @@ export default function ShootingSession() {
 
       <View
         accessible
-        accessibilityLabel={`${t('session.fg')} ${formatPercent(summary.fgPercentage)}, ${t('session.madeCount')} ${summary.made}, ${t('session.missedCount')} ${summary.missed}`}
+        accessibilityLabel={t('session.summaryLabel', {
+          fg: formatPercent(summary.fgPercentage),
+          made: summary.made,
+          missed: summary.missed,
+        })}
         style={[styles.hero, { backgroundColor: theme.surface }]}
       >
         <Text style={[styles.heroLabel, { color: theme.textMuted }]}>{t('session.fg')}</Text>
@@ -73,7 +98,7 @@ export default function ShootingSession() {
           {formatPercent(summary.fgPercentage)}
         </Text>
         <Text style={{ color: theme.textMuted }}>
-          {summary.made} / {summary.attempts}
+          {t('home.sessionSummary', { made: summary.made, attempts: summary.attempts })}
         </Text>
       </View>
 
@@ -87,12 +112,21 @@ export default function ShootingSession() {
       </View>
 
       {recent.length > 0 ? (
-        <View accessible accessibilityLabel={t('session.recentShots')} style={styles.dots}>
+        <View
+          accessible
+          accessibilityLabel={t('session.recentShotsLabel', {
+            results: recent.map(word).join(', '),
+          })}
+          style={styles.dots}
+        >
+          {/* Key = the shot's position in the session, which is stable while newer shots are added. */}
           {recent.map((r, i) => (
-            <Dot key={i} result={r} />
+            <Dot key={recentStart + recent.length - 1 - i} result={r} />
           ))}
         </View>
       ) : null}
+
+      {actionFailed ? <InlineError message={t('session.actionError')} /> : null}
 
       {active ? (
         <>
@@ -124,16 +158,13 @@ export default function ShootingSession() {
             <Button
               label={t('session.end')}
               variant="secondary"
-              onPress={async () => {
-                await repo.endSession(session.id);
-                router.replace('/');
-              }}
+              onPress={() => confirmEnd(session.id)}
               style={styles.flex}
             />
           </View>
         </>
       ) : (
-        <Button label={t('session.done')} onPress={() => router.replace('/')} />
+        <Button label={t('session.done')} onPress={() => router.dismissTo('/')} />
       )}
     </Screen>
   );
@@ -149,9 +180,14 @@ function Screen({ children }: { children: React.ReactNode }) {
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   return (
-    <View accessible accessibilityLabel={`${label} ${value}`} style={styles.stat}>
+    <View
+      accessible
+      accessibilityLabel={t('session.statLabel', { label, value })}
+      style={styles.stat}
+    >
       <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
       <Text style={{ color: theme.textMuted }}>{label}</Text>
     </View>

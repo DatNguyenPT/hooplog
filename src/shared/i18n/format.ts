@@ -11,5 +11,5 @@ export function formatDateTime(iso: string): string {
 }
 
 export function formatPercent(value: number | null): string {
-  return value === null ? '—' : `${Math.round(value)}%`;
+  return value === null ? i18next.t('session.fgEmpty') : `${Math.round(value)}%`;
 }
