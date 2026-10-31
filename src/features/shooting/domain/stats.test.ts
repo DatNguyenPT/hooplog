@@ -1,4 +1,4 @@
-import { fieldGoalPercentage, tally } from './stats';
+import { fieldGoalPercentage, summarize, tally } from './stats';
 
 describe('tally', () => {
   it('counts each result', () => {
@@ -27,5 +27,34 @@ describe('fieldGoalPercentage', () => {
   it('ignores uncertain shots', () => {
     const t = tally(['made', 'uncertain', 'uncertain', 'missed']);
     expect(fieldGoalPercentage(t)).toBe(50);
+  });
+});
+
+describe('summarize', () => {
+  it('is empty for no shots', () => {
+    expect(summarize([])).toEqual({
+      made: 0,
+      missed: 0,
+      uncertain: 0,
+      attempts: 0,
+      fgPercentage: null,
+      currentMakeStreak: 0,
+      longestMakeStreak: 0,
+    });
+  });
+  it('tracks current and longest make streaks', () => {
+    const s = summarize(['made', 'made', 'made', 'missed', 'made', 'made']);
+    expect(s.longestMakeStreak).toBe(3);
+    expect(s.currentMakeStreak).toBe(2);
+    expect(s.attempts).toBe(6);
+    expect(s.fgPercentage).toBeCloseTo(83.33, 1);
+  });
+  it('resets the current streak on a miss', () => {
+    expect(summarize(['made', 'missed']).currentMakeStreak).toBe(0);
+  });
+  it('lets uncertain shots neither extend nor break a streak', () => {
+    const s = summarize(['made', 'uncertain', 'made']);
+    expect(s.currentMakeStreak).toBe(2);
+    expect(s.attempts).toBe(2);
   });
 });

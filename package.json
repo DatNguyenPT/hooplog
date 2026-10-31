@@ -36,6 +36,7 @@
   "devDependencies": {
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "^30.0.0",
+    "@types/node": "~24",
     "@types/react": "~19.3.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "^58.0.4",
@@ -50,7 +51,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "jest",
     "test:harness": "node --test tools/test",
     "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
@@ -62,5 +63,8 @@
     "testMatch": [
       "<rootDir>/src/**/*.test.ts?(x)"
     ]
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
