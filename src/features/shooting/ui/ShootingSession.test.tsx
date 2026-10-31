@@ -13,6 +13,7 @@ const mockRepo: jest.Mocked<ShootingRepository> = {
   undoLastShot: jest.fn(),
   endSession: jest.fn(),
   listSessions: jest.fn(),
+  shotsBetween: jest.fn(),
 };
 const mockDismissTo = jest.fn();
 

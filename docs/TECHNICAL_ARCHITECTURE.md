@@ -58,7 +58,7 @@ Every table: `id` (client-generated UUID), `created_at`, `updated_at`, `deleted_
 
 - `profile` (single row: display name, unit and language preferences)
 - `exercise` (library item; built-in seed + user-created; category, measurement type)
-- `training_plan`, `plan_day`, `plan_item` (weekly schedule, targets)
+- `training_plan`, `plan_item` (weekly schedule: each item has an ISO weekday and its targets; no separate day table, see ADR 0005)
 - `workout_session`, `workout_set` (exercise, reps, weight kg, duration s, distance m)
 - `shooting_session` (date, location label optional, source: `manual` | `ai`)
 - `shot` (session, timestamp, result `made|missed|uncertain`, zone optional, `source` manual|ai, `confidence` nullable, `corrected` boolean)

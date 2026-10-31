@@ -33,6 +33,8 @@ export interface ShootingRepository {
   /** Closes the session; a session with no shots is discarded. */
   endSession(sessionId: string): Promise<void>;
   listSessions(limit: number): Promise<SessionListItem[]>;
+  /** Resolved attempts (made or missed) taken in [fromIso, toIso). Used to measure progress against a plan. */
+  shotsBetween(fromIso: string, toIso: string): Promise<{ takenAt: string }[]>;
 }
 
 export function createShootingRepository(db: SQLiteDatabase): ShootingRepository {
@@ -123,6 +125,16 @@ export function createShootingRepository(db: SQLiteDatabase): ShootingRepository
         now,
         sessionId,
       ]);
+    },
+
+    async shotsBetween(fromIso, toIso) {
+      const rows = await db.getAllAsync<{ taken_at: string }>(
+        `SELECT taken_at FROM shot
+         WHERE deleted_at IS NULL AND result IN ('made', 'missed') AND taken_at >= ? AND taken_at < ?
+         ORDER BY taken_at, rowid`,
+        [fromIso, toIso],
+      );
+      return rows.map((r) => ({ takenAt: r.taken_at }));
     },
 
     async listSessions(limit) {
