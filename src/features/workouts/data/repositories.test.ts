@@ -193,6 +193,36 @@ describe('workout repository', () => {
     expect(list[0].summary).toMatchObject({ sets: 0, durationS: null });
     expect(await workouts.listSessions(1)).toHaveLength(1);
   });
+
+  it('lists live sets logged within a time window, oldest first', async () => {
+    const { workouts, sqlite } = await setup();
+    const id = await workouts.startOrResumeSession();
+    const insert = sqlite.prepare(
+      'INSERT INTO workout_set (id, session_id, exercise_id, logged_at, reps, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    );
+    const at = (hour: number) => `2026-01-05T${String(hour).padStart(2, '0')}:00:00.000Z`;
+    insert.run('late', id, PUSH_UP, at(11), 5, at(11), at(11), null);
+    insert.run('first', id, SQUAT, at(8), 5, at(8), at(8), null);
+    insert.run('before', id, SQUAT, at(7), 5, at(7), at(7), null);
+    insert.run('deleted', id, SQUAT, at(9), 5, at(9), at(9), at(10));
+    insert.run('at-end', id, SQUAT, at(12), 5, at(12), at(12), null);
+
+    // The start of the window is included and the end is not.
+    expect(await workouts.setsBetween(at(8), at(12))).toEqual([
+      { exerciseId: SQUAT, loggedAt: at(8) },
+      { exerciseId: PUSH_UP, loggedAt: at(11) },
+    ]);
+    expect(await workouts.setsBetween(at(13), at(14))).toEqual([]);
+
+    // Sets logged through the repository are found by an ISO window around now.
+    const before = Date.now();
+    await workouts.addSet(id, PUSH_UP, reps(10));
+    const recent = await workouts.setsBetween(
+      new Date(before - 1000).toISOString(),
+      new Date(Date.now() + 1000).toISOString(),
+    );
+    expect(recent.map((s) => s.exerciseId)).toEqual([PUSH_UP]);
+  });
 });
 
 describe('migration v2 -> v3', () => {

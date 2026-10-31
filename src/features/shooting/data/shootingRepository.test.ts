@@ -97,6 +97,39 @@ describe('shooting repository', () => {
     expect(list[1]).toMatchObject({ made: 1, missed: 1 });
     expect(list[0]).toMatchObject({ made: 0, missed: 0, endedAt: null });
   });
+
+  it('lists made and missed shots taken within a time window, oldest first', async () => {
+    const { sqlite, db, migrationDb } = openDb();
+    await runMigrations(migrationDb, migrations);
+    const repo = createShootingRepository(db as never);
+    const session = await repo.startOrResumeSession();
+    const insert = sqlite.prepare(
+      'INSERT INTO shot (id, session_id, taken_at, result, created_at, updated_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    );
+    const at = (hour: number) => `2026-01-05T${String(hour).padStart(2, '0')}:00:00.000Z`;
+    insert.run('late', session, at(11), 'missed', at(11), at(11), null);
+    insert.run('first', session, at(8), 'made', at(8), at(8), null);
+    insert.run('before', session, at(7), 'made', at(7), at(7), null);
+    insert.run('uncertain', session, at(9), 'uncertain', at(9), at(9), null);
+    insert.run('undone', session, at(10), 'made', at(10), at(10), at(10));
+    insert.run('at-end', session, at(12), 'made', at(12), at(12), null);
+
+    // The start of the window is included and the end is not; unresolved and undone shots do not count.
+    expect(await repo.shotsBetween(at(8), at(12))).toEqual([
+      { takenAt: at(8) },
+      { takenAt: at(11) },
+    ]);
+    expect(await repo.shotsBetween(at(13), at(14))).toEqual([]);
+
+    // Shots recorded through the repository are found by an ISO window around now.
+    const before = Date.now();
+    await repo.addShot(session, 'made');
+    const recent = await repo.shotsBetween(
+      new Date(before - 1000).toISOString(),
+      new Date(Date.now() + 1000).toISOString(),
+    );
+    expect(recent).toHaveLength(1);
+  });
 });
 
 describe('migration v1 -> v2', () => {

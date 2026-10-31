@@ -29,9 +29,11 @@ const NAME_ERROR_KEYS: Record<ExerciseNameError, string> = {
 type Props = {
   /** The workout to return to with the chosen exercise. */
   sessionId?: string;
+  /** Replaces the default navigation, e.g. when the picker is used to build a training plan. */
+  onChoose?: (exercise: Exercise) => void;
 };
 
-export function ExercisePicker({ sessionId }: Props) {
+export function ExercisePicker({ sessionId, onChoose }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
   const labels = useWorkoutLabels();
@@ -50,7 +52,8 @@ export function ExercisePicker({ sessionId }: Props) {
   );
 
   const choose = (exercise: Exercise) => {
-    if (sessionId) router.dismissTo(`/workout/${sessionId}?exerciseId=${exercise.id}`);
+    if (onChoose) onChoose(exercise);
+    else if (sessionId) router.dismissTo(`/workout/${sessionId}?exerciseId=${exercise.id}`);
     else router.dismissTo('/');
   };
 

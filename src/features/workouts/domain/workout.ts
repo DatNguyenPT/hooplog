@@ -88,7 +88,8 @@ const LIMITS = {
   distance: { min: 1, max: 100_000, integer: false },
 } as const;
 
-function parseNumber(
+/** Validates one raw field against its limits; also used for plan targets, which share the set limits. */
+export function parseSetNumber(
   raw: string | undefined,
   field: SetField,
 ): { value: number } | { error: SetFieldError } {
@@ -110,7 +111,7 @@ export function parseSetInput(type: MeasurementType, input: SetInput): ParsedSet
   const errors: Partial<Record<SetField, SetFieldError>> = {};
   const numbers: Partial<Record<SetField, number>> = {};
   for (const field of FIELDS_BY_TYPE[type]) {
-    const parsed = parseNumber(input[field], field);
+    const parsed = parseSetNumber(input[field], field);
     if ('error' in parsed) errors[field] = parsed.error;
     else numbers[field] = parsed.value;
   }

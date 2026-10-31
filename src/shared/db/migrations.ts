@@ -102,4 +102,47 @@ export const migrations: Migration[] = [
         ('00000000-0000-4000-8000-000000000020', 'ladder_drill', 'agility', 'duration', 1, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z');
     `,
   },
+  {
+    version: 4,
+    sql: `
+      CREATE TABLE training_plan (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 0 CHECK (is_active IN (0, 1)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        deleted_at TEXT
+      );
+      -- At most one active plan, enforced by the database.
+      CREATE UNIQUE INDEX idx_one_active_plan ON training_plan((1)) WHERE is_active = 1 AND deleted_at IS NULL;
+
+      -- One row per scheduled activity in the weekly schedule. weekday is ISO (1 = Monday ... 7 = Sunday).
+      -- An exercise item carries target_sets plus the targets that fit the exercise's measurement type (metric units);
+      -- a shooting item carries target_shots. Progress is derived from the logs, never stored.
+      CREATE TABLE plan_item (
+        id TEXT PRIMARY KEY NOT NULL,
+        plan_id TEXT NOT NULL REFERENCES training_plan(id),
+        weekday INTEGER NOT NULL CHECK (weekday BETWEEN 1 AND 7),
+        kind TEXT NOT NULL CHECK (kind IN ('exercise', 'shooting')),
+        exercise_id TEXT REFERENCES exercise(id),
+        target_sets INTEGER CHECK (target_sets IS NULL OR target_sets >= 1),
+        target_reps INTEGER CHECK (target_reps IS NULL OR target_reps >= 1),
+        target_weight_kg REAL CHECK (target_weight_kg IS NULL OR target_weight_kg >= 0),
+        target_duration_s INTEGER CHECK (target_duration_s IS NULL OR target_duration_s >= 1),
+        target_distance_m REAL CHECK (target_distance_m IS NULL OR target_distance_m > 0),
+        target_shots INTEGER CHECK (target_shots IS NULL OR target_shots >= 1),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        deleted_at TEXT,
+        CHECK (
+          (kind = 'exercise' AND exercise_id IS NOT NULL AND target_sets IS NOT NULL AND target_shots IS NULL)
+          OR (kind = 'shooting' AND exercise_id IS NULL AND target_shots IS NOT NULL AND target_sets IS NULL)
+        )
+      );
+      CREATE INDEX idx_plan_item_plan ON plan_item(plan_id);
+      -- An exercise appears once per day of a plan, and a plan has one shooting item per day.
+      CREATE UNIQUE INDEX idx_plan_item_exercise_day ON plan_item(plan_id, weekday, exercise_id) WHERE kind = 'exercise' AND deleted_at IS NULL;
+      CREATE UNIQUE INDEX idx_plan_item_shooting_day ON plan_item(plan_id, weekday) WHERE kind = 'shooting' AND deleted_at IS NULL;
+    `,
+  },
 ];

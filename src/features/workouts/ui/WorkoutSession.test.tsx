@@ -16,6 +16,7 @@ const mockRepo: jest.Mocked<WorkoutRepository> = {
   deleteSet: jest.fn(),
   endSession: jest.fn(),
   listSessions: jest.fn(),
+  setsBetween: jest.fn(),
 };
 const mockExercises: jest.Mocked<ExerciseRepository> = {
   list: jest.fn(),

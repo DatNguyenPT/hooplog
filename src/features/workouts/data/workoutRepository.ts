@@ -41,6 +41,8 @@ export interface WorkoutRepository {
   /** Closes the workout; a workout with no sets is discarded. */
   endSession(sessionId: string): Promise<void>;
   listSessions(limit: number): Promise<WorkoutListItem[]>;
+  /** Live sets logged in [fromIso, toIso), as ISO-8601 UTC strings. Used to measure progress against a plan. */
+  setsBetween(fromIso: string, toIso: string): Promise<{ exerciseId: string; loggedAt: string }[]>;
 }
 
 type SetRow = {
@@ -179,6 +181,16 @@ export function createWorkoutRepository(db: SQLiteDatabase): WorkoutRepository {
         'UPDATE workout_session SET ended_at = ?, updated_at = ? WHERE id = ? AND ended_at IS NULL',
         [now, now, sessionId],
       );
+    },
+
+    async setsBetween(fromIso, toIso) {
+      const rows = await db.getAllAsync<{ exercise_id: string; logged_at: string }>(
+        `SELECT exercise_id, logged_at FROM workout_set
+         WHERE deleted_at IS NULL AND logged_at >= ? AND logged_at < ?
+         ORDER BY logged_at, rowid`,
+        [fromIso, toIso],
+      );
+      return rows.map((r) => ({ exerciseId: r.exercise_id, loggedAt: r.logged_at }));
     },
 
     async listSessions(limit) {

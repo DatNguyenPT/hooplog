@@ -13,6 +13,8 @@ import {
   useWorkoutRepository,
   type WorkoutListItem,
 } from '@/features/workouts/data/workoutRepository';
+import type { PlanItem } from '@/features/training-plans/domain/plan';
+import { TodayPlan } from '@/features/training-plans/ui/TodayPlan';
 import { WorkoutRow } from '@/features/workouts/ui/WorkoutRow';
 import { formatDateTime, formatPercent } from '@/shared/i18n/format';
 import { Button } from '@/shared/ui/Button';
@@ -57,13 +59,19 @@ export default function Home() {
   const busy = useRef(false);
   const [startFailed, setStartFailed] = useState(false);
 
-  const start = async (begin: () => Promise<string>, kind: 'shooting' | 'workout') => {
+  /** `exerciseId` opens the workout with that exercise ready to log (used by the training plan). */
+  const start = async (
+    begin: () => Promise<string>,
+    kind: 'shooting' | 'workout',
+    exerciseId?: string,
+  ) => {
     if (busy.current) return;
     busy.current = true;
     setStartFailed(false);
     try {
       const id = await begin();
-      router.push(kind === 'shooting' ? `/shooting/${id}` : `/workout/${id}`);
+      if (kind === 'shooting') router.push(`/shooting/${id}`);
+      else router.push(exerciseId ? `/workout/${id}?exerciseId=${exerciseId}` : `/workout/${id}`);
     } catch {
       setStartFailed(true);
       reload();
@@ -71,6 +79,11 @@ export default function Home() {
       busy.current = false;
     }
   };
+
+  const startPlanned = (item: PlanItem) =>
+    item.kind === 'shooting'
+      ? start(shooting.startOrResumeSession, 'shooting')
+      : start(workouts.startOrResumeSession, 'workout', item.exercise.id);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
@@ -83,38 +96,49 @@ export default function Home() {
       ) : state.status === 'error' ? (
         <ErrorView onRetry={reload} />
       ) : (
-        <>
-          <Button
-            label={state.data.activeShootingId ? t('home.resumeShooting') : t('home.startShooting')}
-            onPress={() => start(shooting.startOrResumeSession, 'shooting')}
-            style={styles.cta}
-          />
-          <Button
-            label={state.data.activeWorkoutId ? t('home.resumeWorkout') : t('home.startWorkout')}
-            onPress={() => start(workouts.startOrResumeSession, 'workout')}
-            style={styles.cta}
-          />
-          {startFailed ? <InlineError message={t('home.startError')} /> : null}
-          <Text accessibilityRole="header" style={[styles.section, { color: theme.textMuted }]}>
-            {t('home.recent')}
-          </Text>
-          {state.data.activity.length === 0 ? (
-            <EmptyView title={t('home.emptyTitle')} hint={t('home.emptyHint')} />
-          ) : (
-            <FlatList
-              data={state.data.activity}
-              keyExtractor={(a) => `${a.kind}-${a.item.id}`}
-              contentContainerStyle={styles.list}
-              renderItem={({ item }) =>
-                item.kind === 'shooting' ? (
-                  <SessionRow item={item.item} />
-                ) : (
-                  <WorkoutRow item={item.item} />
-                )
-              }
-            />
-          )}
-        </>
+        // Everything scrolls together, so a long plan day never squeezes the activity list on a small screen.
+        <FlatList
+          data={state.data.activity}
+          keyExtractor={(a) => `${a.kind}-${a.item.id}`}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            <>
+              <Button
+                label={
+                  state.data.activeShootingId ? t('home.resumeShooting') : t('home.startShooting')
+                }
+                onPress={() => start(shooting.startOrResumeSession, 'shooting')}
+                style={styles.cta}
+              />
+              <Button
+                label={
+                  state.data.activeWorkoutId ? t('home.resumeWorkout') : t('home.startWorkout')
+                }
+                onPress={() => start(workouts.startOrResumeSession, 'workout')}
+                style={styles.cta}
+              />
+              {startFailed ? <InlineError message={t('home.startError')} /> : null}
+              <TodayPlan onStart={startPlanned} />
+              <Button
+                label={t('home.plans')}
+                variant="secondary"
+                onPress={() => router.push('/plans')}
+                style={styles.plans}
+              />
+              <Text accessibilityRole="header" style={[styles.section, { color: theme.textMuted }]}>
+                {t('home.recent')}
+              </Text>
+            </>
+          }
+          ListEmptyComponent={<EmptyView title={t('home.emptyTitle')} hint={t('home.emptyHint')} />}
+          renderItem={({ item }) =>
+            item.kind === 'shooting' ? (
+              <SessionRow item={item.item} />
+            ) : (
+              <WorkoutRow item={item.item} />
+            )
+          }
+        />
       )}
     </SafeAreaView>
   );
@@ -158,6 +182,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
   title: { fontSize: 32, fontWeight: '800', marginTop: 8, marginBottom: 16 },
   cta: { minHeight: 64, marginBottom: 8 },
+  plans: { marginTop: 16 },
   section: { fontSize: 14, fontWeight: '700', marginTop: 24, marginBottom: 8 },
   list: { gap: 8, paddingBottom: 24 },
   row: {
