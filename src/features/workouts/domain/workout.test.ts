@@ -2,6 +2,9 @@ import {
   durationSeconds,
   parseSetInput,
   personalBests,
+  setBars,
+  setCountBars,
+  setToInput,
   setVolume,
   summarizeWorkout,
   type SetValues,
@@ -102,5 +105,93 @@ describe('parseSetInput', () => {
       ok: true,
       values: { distanceM: 400 },
     });
+  });
+});
+
+describe('setToInput', () => {
+  it('turns saved values into form text for the type fields only', () => {
+    expect(setToInput('reps_weight', set({ reps: 8, weightKg: 62.5 }))).toEqual({
+      reps: '8',
+      weight: '62.5',
+    });
+    expect(setToInput('duration', set({ durationS: 45, reps: 3 }))).toEqual({ duration: '45' });
+    expect(setToInput('reps_weight', set({ reps: 5 }))).toEqual({ reps: '5' });
+  });
+  it('round-trips through parseSetInput', () => {
+    const saved = set({ reps: 12, weightKg: 0 });
+    expect(parseSetInput('reps_weight', setToInput('reps_weight', saved))).toEqual({
+      ok: true,
+      values: saved,
+    });
+  });
+});
+
+describe('setBars', () => {
+  const sets = (values: Partial<SetValues>[]) => values.map((v, i) => ({ id: `s${i}`, ...set(v) }));
+
+  it('sizes each set against the largest, using the measurement type field', () => {
+    expect(
+      setBars(
+        'reps_weight',
+        sets([
+          { reps: 5, weightKg: 100 },
+          { reps: 5, weightKg: 50 },
+        ]),
+      ),
+    ).toEqual([
+      { setId: 's0', fraction: 1 },
+      { setId: 's1', fraction: 0.5 },
+    ]);
+    expect(setBars('duration', sets([{ durationS: 30 }, { durationS: 60 }]))[0].fraction).toBe(0.5);
+    expect(setBars('distance', sets([{ distanceM: 400 }, { distanceM: 100 }]))[1].fraction).toBe(
+      0.25,
+    );
+    expect(setBars('reps', sets([{ reps: 10 }, { reps: 20 }]))[0].fraction).toBe(0.5);
+  });
+  it('has nothing to compare for one set or when every value is zero', () => {
+    expect(setBars('reps', sets([{ reps: 10 }]))).toEqual([]);
+    expect(setBars('reps', [])).toEqual([]);
+    expect(
+      setBars(
+        'reps_weight',
+        sets([
+          { reps: 5, weightKg: 0 },
+          { reps: 8, weightKg: 0 },
+        ]),
+      ),
+    ).toEqual([]);
+  });
+  it('keeps an unloaded set as a zero-length bar beside a loaded one', () => {
+    const bars = setBars(
+      'reps_weight',
+      sets([
+        { reps: 5, weightKg: 0 },
+        { reps: 5, weightKg: 20 },
+      ]),
+    );
+    expect(bars.map((b) => b.fraction)).toEqual([0, 1]);
+  });
+});
+
+describe('setCountBars', () => {
+  it('sizes exercises against the one with the most sets', () => {
+    expect(
+      setCountBars([
+        { exerciseId: 'a', sets: 4 },
+        { exerciseId: 'b', sets: 1 },
+      ]),
+    ).toEqual([
+      { exerciseId: 'a', sets: 4, fraction: 1 },
+      { exerciseId: 'b', sets: 1, fraction: 0.25 },
+    ]);
+  });
+  it('needs two exercises with sets to compare', () => {
+    expect(setCountBars([{ exerciseId: 'a', sets: 3 }])).toEqual([]);
+    expect(
+      setCountBars([
+        { exerciseId: 'a', sets: 3 },
+        { exerciseId: 'b', sets: 0 },
+      ]),
+    ).toEqual([]);
   });
 });

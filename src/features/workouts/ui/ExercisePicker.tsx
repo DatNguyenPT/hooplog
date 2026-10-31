@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -41,6 +41,7 @@ export function ExercisePicker({ sessionId }: Props) {
   const { state, reload } = useLoad(load);
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState(false);
+  const [removeFailed, setRemoveFailed] = useState(false);
 
   const exercises = state.status === 'ready' ? state.data : null;
   const visible = useMemo(
@@ -52,6 +53,23 @@ export function ExercisePicker({ sessionId }: Props) {
     if (sessionId) router.dismissTo(`/workout/${sessionId}?exerciseId=${exercise.id}`);
     else router.dismissTo('/');
   };
+
+  const remove = async (exercise: Exercise) => {
+    setRemoveFailed(false);
+    try {
+      await repo.softDeleteCustom(exercise.id);
+    } catch {
+      setRemoveFailed(true);
+    } finally {
+      reload();
+    }
+  };
+
+  const confirmRemove = (exercise: Exercise, name: string) =>
+    Alert.alert(t('picker.deleteTitle', { name }), t('picker.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('picker.delete'), style: 'destructive', onPress: () => void remove(exercise) },
+    ]);
 
   if (state.status === 'loading')
     return (
@@ -102,6 +120,7 @@ export function ExercisePicker({ sessionId }: Props) {
         ]}
       />
       <Button label={t('picker.create')} variant="secondary" onPress={() => setCreating(true)} />
+      {removeFailed ? <InlineError message={t('picker.deleteError')} /> : null}
       {visible.length === 0 ? (
         <EmptyView title={t('picker.emptyTitle')} hint={t('picker.emptyHint')} />
       ) : (
@@ -115,17 +134,31 @@ export function ExercisePicker({ sessionId }: Props) {
             const category = labels.category(item.category);
             const measurement = labels.measurement(item.measurementType);
             return (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t('picker.rowLabel', { name, category, measurement })}
-                onPress={() => choose(item)}
-                style={[styles.row, { backgroundColor: theme.surface }]}
-              >
-                <Text style={[styles.rowTitle, { color: theme.text }]}>{name}</Text>
-                <Text style={{ color: theme.textMuted }}>
-                  {t('picker.rowSubtitle', { category, measurement })}
-                </Text>
-              </Pressable>
+              <View style={[styles.row, { backgroundColor: theme.surface }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('picker.rowLabel', { name, category, measurement })}
+                  onPress={() => choose(item)}
+                  style={styles.rowMain}
+                >
+                  <Text style={[styles.rowTitle, { color: theme.text }]}>{name}</Text>
+                  <Text style={{ color: theme.textMuted }}>
+                    {t('picker.rowSubtitle', { category, measurement })}
+                  </Text>
+                </Pressable>
+                {item.isBuiltin ? null : (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t('picker.deleteLabel', { name })}
+                    onPress={() => confirmRemove(item, name)}
+                    style={styles.rowDelete}
+                  >
+                    <Text style={[styles.rowDeleteText, { color: theme.missed }]}>
+                      {t('picker.delete')}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
             );
           }}
         />
@@ -252,8 +285,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   list: { gap: 8, paddingBottom: 12 },
-  row: { minHeight: 64, borderRadius: 14, padding: 14, justifyContent: 'center', gap: 2 },
+  row: { minHeight: 64, borderRadius: 14, flexDirection: 'row', alignItems: 'center' },
+  rowMain: { flex: 1, minHeight: 64, padding: 14, justifyContent: 'center', gap: 2 },
   rowTitle: { fontSize: 17, fontWeight: '600' },
+  rowDelete: { minWidth: 72, minHeight: 64, alignItems: 'center', justifyContent: 'center' },
+  rowDeleteText: { fontSize: 15, fontWeight: '700' },
   create: { gap: 12 },
   label: { fontSize: 14, fontWeight: '600' },
   types: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

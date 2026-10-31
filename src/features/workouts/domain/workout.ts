@@ -125,3 +125,56 @@ export function parseSetInput(type: MeasurementType, input: SetInput): ParsedSet
     },
   };
 }
+
+/** Form text for a saved set, so editing starts from what was logged. Only the type's fields are filled. */
+export function setToInput(type: MeasurementType, set: SetValues): SetInput {
+  const saved: Record<SetField, number | null> = {
+    reps: set.reps,
+    weight: set.weightKg,
+    duration: set.durationS,
+    distance: set.distanceM,
+  };
+  const input: SetInput = {};
+  for (const field of FIELDS_BY_TYPE[type]) {
+    const value = saved[field];
+    if (value !== null) input[field] = String(value);
+  }
+  return input;
+}
+
+// ---- Chart geometry (pure; the UI only draws) ----
+
+/** The one number that sizes a set's bar, per measurement type. */
+const BAR_FIELD: Record<MeasurementType, keyof SetValues> = {
+  reps: 'reps',
+  reps_weight: 'weightKg',
+  duration: 'durationS',
+  distance: 'distanceM',
+};
+
+export type SetBar = { setId: string; fraction: number };
+
+/**
+ * Bar lengths (0..1, relative to the largest set) for one exercise's sets, in logged order.
+ * Empty when there is nothing to compare: fewer than two sets, or no positive value.
+ */
+export function setBars(
+  type: MeasurementType,
+  sets: readonly (SetValues & { id: string })[],
+): SetBar[] {
+  if (sets.length < 2) return [];
+  const field = BAR_FIELD[type];
+  const max = Math.max(0, ...sets.map((s) => s[field] ?? 0));
+  if (max === 0) return [];
+  return sets.map((s) => ({ setId: s.id, fraction: (s[field] ?? 0) / max }));
+}
+
+/** Sets per exercise as bar lengths relative to the busiest one. Empty unless two or more exercises have sets. */
+export function setCountBars<T extends { exerciseId: string; sets: number }>(
+  counts: readonly T[],
+): (T & { fraction: number })[] {
+  const used = counts.filter((c) => c.sets > 0);
+  if (used.length < 2) return [];
+  const max = Math.max(...used.map((c) => c.sets));
+  return used.map((c) => ({ ...c, fraction: c.sets / max }));
+}

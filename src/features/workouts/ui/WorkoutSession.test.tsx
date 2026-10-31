@@ -93,6 +93,7 @@ beforeEach(() => {
   });
   jest.clearAllMocks();
   mockRepo.addSet.mockResolvedValue('new-set');
+  mockRepo.updateSet.mockResolvedValue();
   mockRepo.deleteSet.mockResolvedValue();
   mockRepo.endSession.mockResolvedValue();
   mockExercises.get.mockResolvedValue(null);
@@ -209,6 +210,112 @@ describe('WorkoutSession screen', () => {
     await waitFor(() => expect(mockRepo.deleteSet).toHaveBeenCalledWith('s2'));
   });
 
+  it('edits a set in place, starting from its saved values', async () => {
+    mockRepo.getSession.mockResolvedValue(withSquats());
+    mockRepo.updateSet.mockResolvedValue();
+    await render(<WorkoutSession id="w1" />);
+    await fireEvent.press(await screen.findByLabelText('Edit set 2 of Squat, 5 reps at 100 kg'));
+
+    expect(screen.getByText('Edit set 2: Squat')).toBeTruthy();
+    expect(screen.queryByText('Log a set: Squat')).toBeNull();
+    expect(screen.getByLabelText('Reps').props.value).toBe('5');
+    expect(screen.getByLabelText('Weight (kg)').props.value).toBe('100');
+
+    await fireEvent.changeText(screen.getByLabelText('Reps'), '6');
+    await fireEvent.changeText(screen.getByLabelText('Weight (kg)'), '102,5');
+    await fireEvent.press(screen.getByLabelText('Save changes'));
+    await waitFor(() =>
+      expect(mockRepo.updateSet).toHaveBeenCalledWith('s2', {
+        reps: 6,
+        weightKg: 102.5,
+        durationS: null,
+        distanceM: null,
+      }),
+    );
+    expect(mockRepo.addSet).not.toHaveBeenCalled();
+    expect(await screen.findByText('Log a set: Squat')).toBeTruthy();
+    expect(screen.queryByText('Edit set 2: Squat')).toBeNull();
+  });
+
+  it('cancels an edit without saving', async () => {
+    mockRepo.getSession.mockResolvedValue(withSquats());
+    await render(<WorkoutSession id="w1" />);
+    await fireEvent.press(await screen.findByLabelText('Edit set 1 of Squat, 5 reps at 100 kg'));
+    await fireEvent.changeText(screen.getByLabelText('Reps'), '9');
+    await fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(await screen.findByText('Log a set: Squat')).toBeTruthy();
+    expect(mockRepo.updateSet).not.toHaveBeenCalled();
+  });
+
+  it('validates an edit and keeps the form open when saving fails', async () => {
+    mockRepo.getSession.mockResolvedValue(withSquats());
+    mockRepo.updateSet.mockRejectedValue(new Error('disk full'));
+    await render(<WorkoutSession id="w1" />);
+    await fireEvent.press(await screen.findByLabelText('Edit set 1 of Squat, 5 reps at 100 kg'));
+
+    await fireEvent.changeText(screen.getByLabelText('Reps'), '');
+    await fireEvent.press(screen.getByLabelText('Save changes'));
+    expect(await screen.findByText('Reps is required.')).toBeTruthy();
+    expect(mockRepo.updateSet).not.toHaveBeenCalled();
+
+    await fireEvent.changeText(screen.getByLabelText('Reps'), '7');
+    await fireEvent.press(screen.getByLabelText('Save changes'));
+    expect(await screen.findByText('Could not save that. Please try again.')).toBeTruthy();
+    expect(screen.getByText('Edit set 1: Squat')).toBeTruthy();
+    expect(screen.getByLabelText('Reps').props.value).toBe('7');
+  });
+
+  it('keeps the typed edit when another set is deleted meanwhile', async () => {
+    mockRepo.getSession.mockResolvedValue(withSquats());
+    await render(<WorkoutSession id="w1" />);
+    await fireEvent.press(await screen.findByLabelText('Edit set 2 of Squat, 5 reps at 100 kg'));
+    await fireEvent.changeText(screen.getByLabelText('Reps'), '9');
+    expect(screen.queryByLabelText('Delete set 2 of Squat')).toBeNull();
+    await fireEvent.press(screen.getByLabelText('Delete set 1 of Squat'));
+    await waitFor(() => expect(mockRepo.deleteSet).toHaveBeenCalledWith('s1'));
+    expect(screen.getByLabelText('Reps').props.value).toBe('9');
+  });
+
+  it('draws a bar per set and a sets-per-exercise overview', async () => {
+    mockRepo.getSession.mockResolvedValue(
+      noSets({
+        groups: [
+          { exercise: squat, sets: [squatSet('s1', 5, 100), squatSet('s2', 5, 60)] },
+          {
+            exercise: plank,
+            sets: [
+              {
+                id: 'p1',
+                exerciseId: plank.id,
+                loggedAt: '2026-05-01T10:20:00.000Z',
+                reps: null,
+                weightKg: null,
+                durationS: 45,
+                distanceM: null,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    await render(<WorkoutSession id="w1" />);
+    expect(await screen.findByText('Sets per exercise')).toBeTruthy();
+    expect(screen.getByLabelText('Squat, 2 sets')).toBeTruthy();
+    expect(screen.getByLabelText('Plank, 1 set')).toBeTruthy();
+    // Only the squat sets have something to compare; a lone set gets no bar.
+    expect(screen.getAllByTestId('set-bar', { includeHiddenElements: true })).toHaveLength(2);
+  });
+
+  it('skips the overview for a single exercise and bars for a single set', async () => {
+    mockRepo.getSession.mockResolvedValue(
+      noSets({ groups: [{ exercise: squat, sets: [squatSet('s1', 5, 100)] }] }),
+    );
+    await render(<WorkoutSession id="w1" />);
+    await screen.findByText('Squat');
+    expect(screen.queryByText('Sets per exercise')).toBeNull();
+    expect(screen.queryAllByTestId('set-bar', { includeHiddenElements: true })).toHaveLength(0);
+  });
+
   it('asks for confirmation before ending, then returns home', async () => {
     mockRepo.getSession.mockResolvedValue(withSquats());
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -228,6 +335,7 @@ describe('WorkoutSession screen', () => {
     expect(screen.getByLabelText('Duration 45:30')).toBeTruthy();
     expect(screen.queryByLabelText('Add set')).toBeNull();
     expect(screen.queryByLabelText('Delete set 1 of Squat')).toBeNull();
+    expect(screen.queryByLabelText(/^Edit set/)).toBeNull();
     expect(screen.getByLabelText('Squat, set 1, 5 reps at 100 kg')).toBeTruthy();
   });
 });

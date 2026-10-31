@@ -13,9 +13,10 @@ import { useLoad } from '@/shared/ui/useLoad';
 import { useExerciseRepository } from '../data/exerciseRepository';
 import { useWorkoutRepository, type ExerciseGroup } from '../data/workoutRepository';
 import type { Exercise } from '../domain/exercise';
-import { summarizeWorkout } from '../domain/workout';
+import { setBars, setCountBars, summarizeWorkout, type SetValues } from '../domain/workout';
 import { useWorkoutLabels } from './labels';
 import { SetForm } from './SetForm';
+import { SetBar, WorkoutOverview } from './WorkoutCharts';
 
 type Props = {
   id: string;
@@ -42,6 +43,11 @@ export function WorkoutSession({ id, pickedExerciseId }: Props) {
   // A tapped exercise only counts for the picker result it was tapped under; a new pick resets it.
   const [tapped, setTapped] = useState<{ forPick: string | undefined; id: string } | null>(null);
   const chosenId = tapped && tapped.forPick === pickedExerciseId ? tapped.id : null;
+  // The set being edited follows the same rule: coming back from the picker ends the edit.
+  const [editing, setEditing] = useState<{ forPick: string | undefined; setId: string } | null>(
+    null,
+  );
+  const editingSetId = editing && editing.forPick === pickedExerciseId ? editing.setId : null;
   const [actionFailed, setActionFailed] = useState(false);
 
   const run = async (action: () => Promise<void>) => {
@@ -100,6 +106,21 @@ export function WorkoutSession({ id, pickedExerciseId }: Props) {
     picked ??
     session.groups[session.groups.length - 1]?.exercise ??
     null;
+  // Only a set that still exists can be edited (it may have been deleted since).
+  const editingActive =
+    active && session.groups.some((g) => g.sets.some((s) => s.id === editingSetId));
+  const overview = setCountBars(
+    session.groups.map((g) => ({
+      exerciseId: g.exercise.id,
+      name: labels.exerciseName(g.exercise),
+      sets: g.sets.length,
+    })),
+  );
+
+  const startEdit = (exerciseId: string, setId: string) => {
+    setTapped({ forPick: pickedExerciseId, id: exerciseId });
+    setEditing({ forPick: pickedExerciseId, setId });
+  };
 
   const confirmEnd = () =>
     Alert.alert(t('workout.endConfirmTitle'), t('workout.endConfirmBody'), [
@@ -136,6 +157,8 @@ export function WorkoutSession({ id, pickedExerciseId }: Props) {
           ) : null}
         </View>
 
+        {overview.length > 0 ? <WorkoutOverview rows={overview} /> : null}
+
         {session.groups.length === 0 && !selected ? (
           <View style={styles.empty}>
             <EmptyView title={t('workout.emptyTitle')} hint={t('workout.emptyHint')} />
@@ -148,14 +171,25 @@ export function WorkoutSession({ id, pickedExerciseId }: Props) {
             group={group}
             active={active}
             selected={active && selected?.id === group.exercise.id}
-            onSelect={() => setTapped({ forPick: pickedExerciseId, id: group.exercise.id })}
-            onDeleteSet={(setId) => run(() => repo.deleteSet(setId))}
+            editingSetId={editingActive ? editingSetId : null}
+            onSelect={() => {
+              setTapped({ forPick: pickedExerciseId, id: group.exercise.id });
+              setEditing(null);
+            }}
+            onEditSet={(setId) => startEdit(group.exercise.id, setId)}
+            onSaveSet={async (setId, values) => {
+              await repo.updateSet(setId, values);
+              setEditing(null);
+              reload();
+            }}
+            onCancelEdit={() => setEditing(null)}
+            onDeleteSet={(setId) => void run(() => repo.deleteSet(setId))}
           />
         ))}
 
         {actionFailed ? <InlineError message={t('workout.actionError')} /> : null}
 
-        {active && selected ? (
+        {active && selected && !editingActive ? (
           <View style={[styles.logCard, { backgroundColor: theme.surface }]}>
             <Text accessibilityRole="header" style={[styles.logTitle, { color: theme.text }]}>
               {t('workout.logHeading', { exercise: labels.exerciseName(selected) })}
@@ -198,19 +232,31 @@ function GroupCard({
   group,
   active,
   selected,
+  editingSetId,
   onSelect,
+  onEditSet,
+  onSaveSet,
+  onCancelEdit,
   onDeleteSet,
 }: {
   group: ExerciseGroup;
   active: boolean;
   selected: boolean;
+  editingSetId: string | null;
   onSelect: () => void;
+  onEditSet: (setId: string) => void;
+  /** Rejecting keeps the form open with an inline error. */
+  onSaveSet: (setId: string, values: SetValues) => Promise<void>;
+  onCancelEdit: () => void;
   onDeleteSet: (setId: string) => void;
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const labels = useWorkoutLabels();
   const name = labels.exerciseName(group.exercise);
+  const fractions = new Map(
+    setBars(group.exercise.measurementType, group.sets).map((b) => [b.setId, b.fraction]),
+  );
 
   const header = <Text style={[styles.groupTitle, { color: theme.text }]}>{name}</Text>;
 
@@ -235,7 +281,35 @@ function GroupCard({
         <View style={styles.groupHeader}>{header}</View>
       )}
       {group.sets.map((set, index) => {
+        if (set.id === editingSetId) {
+          return (
+            <View
+              key={set.id}
+              style={[
+                styles.editBlock,
+                { backgroundColor: theme.background, borderColor: theme.primary },
+              ]}
+            >
+              <Text accessibilityRole="header" style={[styles.editTitle, { color: theme.text }]}>
+                {t('workout.editHeading', { number: index + 1, exercise: name })}
+              </Text>
+              <SetForm
+                exercise={group.exercise}
+                initial={set}
+                onSubmit={(values) => onSaveSet(set.id, values)}
+                onCancel={onCancelEdit}
+              />
+            </View>
+          );
+        }
         const details = labels.setDetails(set, group.exercise.measurementType);
+        const fraction = fractions.get(set.id);
+        const text = (
+          <View style={styles.setText}>
+            <Text style={[styles.setDetails, { color: theme.text }]}>{details}</Text>
+            {fraction !== undefined ? <SetBar fraction={fraction} /> : null}
+          </View>
+        );
         return (
           <View
             key={set.id}
@@ -247,10 +321,33 @@ function GroupCard({
                 : t('workout.setLabel', { exercise: name, number: index + 1, details })
             }
           >
-            <Text style={[styles.setNumber, { color: theme.textMuted }]}>
-              {t('workout.setNumber', { number: index + 1 })}
-            </Text>
-            <Text style={[styles.setDetails, { color: theme.text }]}>{details}</Text>
+            {active ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('workout.editSet', {
+                  number: index + 1,
+                  exercise: name,
+                  details,
+                })}
+                onPress={() => onEditSet(set.id)}
+                style={styles.setMain}
+              >
+                <Text style={[styles.setNumber, { color: theme.textMuted }]}>
+                  {t('workout.setNumber', { number: index + 1 })}
+                </Text>
+                {text}
+                <Text style={[styles.editHint, { color: theme.textMuted }]}>
+                  {t('workout.edit')}
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={styles.setMain}>
+                <Text style={[styles.setNumber, { color: theme.textMuted }]}>
+                  {t('workout.setNumber', { number: index + 1 })}
+                </Text>
+                {text}
+              </View>
+            )}
             {active ? (
               <Pressable
                 accessibilityRole="button"
@@ -310,9 +407,14 @@ const styles = StyleSheet.create({
   group: { borderRadius: 16, borderWidth: 2, padding: 12, gap: 4 },
   groupHeader: { minHeight: 44, justifyContent: 'center' },
   groupTitle: { fontSize: 18, fontWeight: '700' },
-  setRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 12 },
+  setRow: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+  setMain: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 12 },
   setNumber: { width: 56, fontWeight: '600' },
-  setDetails: { flex: 1, fontSize: 16 },
+  setText: { flex: 1 },
+  setDetails: { fontSize: 16 },
+  editHint: { fontSize: 14, fontWeight: '600' },
+  editBlock: { borderRadius: 12, borderWidth: 1, padding: 10, gap: 8, marginVertical: 4 },
+  editTitle: { fontSize: 16, fontWeight: '700' },
   deleteSet: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   deleteGlyph: { fontSize: 28, fontWeight: '700' },
   logCard: { borderRadius: 16, padding: 12, gap: 8 },

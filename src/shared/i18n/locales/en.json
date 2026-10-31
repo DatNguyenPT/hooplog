@@ -73,7 +73,15 @@
     "selectExercise": "Log sets for {{exercise}}",
     "setNumber": "Set {{number}}",
     "deleteSet": "Delete set {{number}} of {{exercise}}",
-    "setLabel": "{{exercise}}, set {{number}}, {{details}}"
+    "setLabel": "{{exercise}}, set {{number}}, {{details}}",
+    "edit": "Edit",
+    "editSet": "Edit set {{number}} of {{exercise}}, {{details}}",
+    "editHeading": "Edit set {{number}}: {{exercise}}",
+    "saveSet": "Save changes",
+    "overviewTitle": "Sets per exercise",
+    "overviewRowLabel": "{{exercise}}, {{sets}}",
+    "setCount_one": "{{count}} set",
+    "setCount_other": "{{count}} sets"
   },
   "set": {
     "reps_one": "{{count}} rep",
@@ -109,7 +117,12 @@
     "createError": "Could not save the exercise. Please try again.",
     "nameRequired": "Enter a name.",
     "nameTooLong": "That name is too long.",
-    "nameDuplicate": "An exercise with that name already exists."
+    "nameDuplicate": "An exercise with that name already exists.",
+    "delete": "Delete",
+    "deleteLabel": "Delete {{name}}",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteBody": "It is removed from this list. Workouts you already logged keep their sets.",
+    "deleteError": "Could not delete the exercise. Please try again."
   },
   "measurement": {
     "reps": "Reps",

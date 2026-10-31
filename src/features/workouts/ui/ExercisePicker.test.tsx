@@ -1,3 +1,4 @@
+import { Alert } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import type { ExerciseRepository } from '@/features/workouts/data/exerciseRepository';
@@ -103,6 +104,39 @@ describe('ExercisePicker screen', () => {
     await waitFor(() =>
       expect(mockDismissTo).toHaveBeenCalledWith('/workout/w1?exerciseId=ex-new'),
     );
+  });
+
+  it('offers delete on custom exercises only, and asks before deleting', async () => {
+    mockRepo.softDeleteCustom.mockResolvedValue();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await render(<ExercisePicker sessionId="w1" />);
+    await screen.findByText('Mikan drill');
+    expect(screen.queryByLabelText('Delete Squat')).toBeNull();
+
+    await fireEvent.press(screen.getByLabelText('Delete Mikan drill'));
+    expect(alert.mock.calls[0][0]).toBe('Delete Mikan drill?');
+    expect(mockRepo.softDeleteCustom).not.toHaveBeenCalled();
+
+    mockRepo.list.mockResolvedValue([squat]);
+    const buttons = alert.mock.calls[0][2] ?? [];
+    buttons.find((b) => b.style === 'destructive')?.onPress?.();
+    await waitFor(() => expect(mockRepo.softDeleteCustom).toHaveBeenCalledWith('ex-mikan'));
+    await waitFor(() => expect(screen.queryByText('Mikan drill')).toBeNull());
+    expect(screen.getByText('Squat')).toBeTruthy();
+    expect(mockDismissTo).not.toHaveBeenCalled();
+  });
+
+  it('keeps the exercise and shows an inline error when deleting fails', async () => {
+    mockRepo.softDeleteCustom.mockRejectedValue(new Error('disk full'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    await render(<ExercisePicker sessionId="w1" />);
+    await fireEvent.press(await screen.findByLabelText('Delete Mikan drill'));
+    const buttons = alert.mock.calls[0][2] ?? [];
+    buttons.find((b) => b.style === 'destructive')?.onPress?.();
+    expect(
+      await screen.findByText('Could not delete the exercise. Please try again.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Mikan drill')).toBeTruthy();
   });
 
   it('shows an inline error when creating fails', async () => {

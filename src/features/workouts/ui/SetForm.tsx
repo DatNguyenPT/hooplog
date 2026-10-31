@@ -9,6 +9,7 @@ import type { Exercise } from '../domain/exercise';
 import {
   FIELDS_BY_TYPE,
   parseSetInput,
+  setToInput,
   type SetField,
   type SetFieldError,
   type SetInput,
@@ -19,15 +20,20 @@ type Props = {
   exercise: Exercise;
   /** Rejecting shows an inline error; the typed values are kept so the user can retry. */
   onSubmit: (values: SetValues) => Promise<void>;
+  /** Editing a saved set: the form starts from these values and offers `onCancel`. */
+  initial?: SetValues;
+  onCancel?: () => void;
 };
 
 const INTEGER_FIELDS: readonly SetField[] = ['reps', 'duration'];
 
 /** Numeric inputs for one exercise's measurement type. Validation lives in the domain (`parseSetInput`). */
-export function SetForm({ exercise, onSubmit }: Props) {
+export function SetForm({ exercise, onSubmit, initial, onCancel }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const [input, setInput] = useState<SetInput>({});
+  const [input, setInput] = useState<SetInput>(() =>
+    initial ? setToInput(exercise.measurementType, initial) : {},
+  );
   const [errors, setErrors] = useState<Partial<Record<SetField, SetFieldError>>>({});
   const [saveFailed, setSaveFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -90,7 +96,14 @@ export function SetForm({ exercise, onSubmit }: Props) {
         })}
       </View>
       {saveFailed ? <InlineError message={t('workout.actionError')} /> : null}
-      <Button label={t('workout.addSet')} onPress={submit} disabled={submitting} />
+      <Button
+        label={initial ? t('workout.saveSet') : t('workout.addSet')}
+        onPress={submit}
+        disabled={submitting}
+      />
+      {onCancel ? (
+        <Button label={t('common.cancel')} variant="secondary" onPress={onCancel} />
+      ) : null}
     </View>
   );
 }
