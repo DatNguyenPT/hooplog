@@ -1,12 +1,36 @@
 {
-  "common": { "loading": "Loading…", "error": "Something went wrong.", "retry": "Try again" },
-  "devCheck": {
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong.",
+    "retry": "Try again"
+  },
+  "home": {
     "title": "HoopLog",
-    "subtitle": "Foundation check: storage works on this device.",
+    "startShooting": "Start shooting session",
+    "resumeShooting": "Resume shooting session",
+    "recent": "Recent shooting sessions",
+    "emptyTitle": "No sessions yet",
+    "emptyHint": "Start a shooting session and tap Made or Missed after every shot.",
+    "inProgress": "In progress",
+    "sessionSummary": "{{made}} / {{attempts}} made"
+  },
+  "session": {
+    "title": "Shooting session",
+    "summaryTitle": "Session summary",
     "made": "Made",
     "missed": "Missed",
+    "undo": "Undo last shot",
+    "undoShort": "Undo",
+    "end": "End session",
+    "done": "Done",
     "fg": "FG%",
-    "fgEmpty": "No shots yet",
-    "shots": "{{count}} shots stored on this device"
+    "fgEmpty": "—",
+    "attempts": "Attempts",
+    "madeCount": "Made",
+    "missedCount": "Missed",
+    "streak": "Streak",
+    "bestStreak": "Best streak",
+    "recentShots": "Last shots",
+    "notFound": "This session no longer exists."
   }
 }

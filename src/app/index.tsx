@@ -1,111 +1,124 @@
-import { useSQLiteContext } from 'expo-sqlite';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { useCallback } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { createShotRepository } from '@/features/shooting/data/shotRepository';
-import { fieldGoalPercentage, type ShotTally } from '@/features/shooting/domain/stats';
+import {
+  useShootingRepository,
+  type SessionListItem,
+} from '@/features/shooting/data/shootingRepository';
+import { fieldGoalPercentage } from '@/features/shooting/domain/stats';
+import { formatDateTime, formatPercent } from '@/shared/i18n/format';
+import { Button } from '@/shared/ui/Button';
+import { EmptyView, ErrorView, LoadingView } from '@/shared/ui/StateViews';
+import { useTheme } from '@/shared/ui/theme';
+import { useLoad } from '@/shared/ui/useLoad';
 
-/** Milestone 0 foundation check: proves SQLite read/write on a real device. Replaced by the real shooting session in M1. */
-export default function Index() {
+export default function Home() {
   const { t } = useTranslation();
-  const db = useSQLiteContext();
-  const repo = useMemo(() => createShotRepository(db), [db]);
-  const [counts, setCounts] = useState<ShotTally | null>(null);
-  const [failed, setFailed] = useState(false);
+  const theme = useTheme();
+  const repo = useShootingRepository();
 
-  const refresh = useCallback(async () => {
-    try {
-      setCounts(await repo.tallyAll());
-      setFailed(false);
-    } catch {
-      setFailed(true);
-    }
+  const load = useCallback(async () => {
+    const [sessions, activeId] = await Promise.all([
+      repo.listSessions(50),
+      repo.getActiveSessionId(),
+    ]);
+    return { sessions, activeId };
   }, [repo]);
+  const { state, reload } = useLoad(load);
 
-  useEffect(() => {
-    let active = true;
-    repo
-      .tallyAll()
-      .then((t) => active && setCounts(t))
-      .catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-    };
-  }, [repo]);
-
-  const add = async (result: 'made' | 'missed') => {
+  const start = async () => {
     try {
-      await repo.addShot(result);
-      await refresh();
+      const id = await repo.startOrResumeSession();
+      router.push(`/shooting/${id}`);
     } catch {
-      setFailed(true);
+      reload();
     }
   };
 
-  const fg = counts ? fieldGoalPercentage(counts) : null;
-
   return (
-    <SafeAreaView style={styles.container}>
-      <Text accessibilityRole="header" style={styles.title}>
-        {t('devCheck.title')}
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
+        {t('home.title')}
       </Text>
-      <Text style={styles.subtitle}>{t('devCheck.subtitle')}</Text>
 
-      {failed ? (
-        <Pressable accessibilityRole="button" onPress={refresh} style={styles.button}>
-          <Text style={styles.buttonText}>
-            {t('common.error')} {t('common.retry')}
-          </Text>
-        </Pressable>
-      ) : counts === null ? (
-        <Text>{t('common.loading')}</Text>
+      {state.status === 'loading' ? (
+        <LoadingView />
+      ) : state.status === 'error' ? (
+        <ErrorView onRetry={reload} />
       ) : (
         <>
-          <Text style={styles.stat}>
-            {t('devCheck.fg')}: {fg === null ? t('devCheck.fgEmpty') : `${fg.toFixed(0)}%`}
+          <Button
+            label={state.data.activeId ? t('home.resumeShooting') : t('home.startShooting')}
+            onPress={start}
+            style={styles.cta}
+          />
+          <Text accessibilityRole="header" style={[styles.section, { color: theme.textMuted }]}>
+            {t('home.recent')}
           </Text>
-          <Text>{t('devCheck.shots', { count: counts.made + counts.missed })}</Text>
+          {state.data.sessions.length === 0 ? (
+            <EmptyView title={t('home.emptyTitle')} hint={t('home.emptyHint')} />
+          ) : (
+            <FlatList
+              data={state.data.sessions}
+              keyExtractor={(s) => s.id}
+              contentContainerStyle={styles.list}
+              renderItem={({ item }) => <SessionRow item={item} />}
+            />
+          )}
         </>
       )}
-
-      <View style={styles.row}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => add('made')}
-          style={[styles.button, styles.made]}
-        >
-          <Text style={styles.buttonText}>{t('devCheck.made')}</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => add('missed')}
-          style={[styles.button, styles.missed]}
-        >
-          <Text style={styles.buttonText}>{t('devCheck.missed')}</Text>
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
 
+function SessionRow({ item }: { item: SessionListItem }) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const attempts = item.made + item.missed;
+  const fg = formatPercent(fieldGoalPercentage(item));
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${formatDateTime(item.startedAt)}, ${t('home.sessionSummary', {
+        made: item.made,
+        attempts,
+      })}, ${t('session.fg')} ${fg}`}
+      onPress={() => router.push(`/shooting/${item.id}`)}
+      style={[styles.row, { backgroundColor: theme.surface }]}
+    >
+      <View style={styles.rowText}>
+        <Text style={[styles.rowTitle, { color: theme.text }]}>
+          {formatDateTime(item.startedAt)}
+        </Text>
+        <Text style={{ color: theme.textMuted }}>
+          {item.endedAt === null
+            ? t('home.inProgress')
+            : t('home.sessionSummary', { made: item.made, attempts })}
+        </Text>
+      </View>
+      <Text style={[styles.rowFg, { color: theme.text }]}>{fg}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16, gap: 12 },
-  title: { fontSize: 32, fontWeight: '700' },
-  subtitle: { fontSize: 16, textAlign: 'center' },
-  stat: { fontSize: 28, fontWeight: '600' },
-  row: { flexDirection: 'row', gap: 16, marginTop: 24 },
-  button: {
-    minHeight: 56,
-    minWidth: 120,
-    borderRadius: 12,
+  container: { flex: 1, paddingHorizontal: 16 },
+  title: { fontSize: 32, fontWeight: '800', marginTop: 8, marginBottom: 16 },
+  cta: { minHeight: 64 },
+  section: { fontSize: 14, fontWeight: '700', marginTop: 24, marginBottom: 8 },
+  list: { gap: 8, paddingBottom: 24 },
+  row: {
+    minHeight: 64,
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    backgroundColor: '#444',
+    justifyContent: 'space-between',
   },
-  made: { backgroundColor: '#1b8a3a' },
-  missed: { backgroundColor: '#b3261e' },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  rowText: { flex: 1, gap: 2 },
+  rowTitle: { fontSize: 16, fontWeight: '600' },
+  rowFg: { fontSize: 24, fontWeight: '800' },
 });

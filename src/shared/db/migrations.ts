@@ -28,4 +28,8 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_shot_session ON shot(session_id);
     `,
   },
+  {
+    version: 2,
+    sql: `ALTER TABLE shooting_session ADD COLUMN ended_at TEXT;`,
+  },
 ];

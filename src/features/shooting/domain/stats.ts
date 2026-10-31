@@ -17,3 +17,32 @@ export function fieldGoalPercentage({
   if (attempts === 0) return null;
   return (made / attempts) * 100;
 }
+
+export type SessionSummary = ShotTally & {
+  attempts: number;
+  fgPercentage: number | null;
+  currentMakeStreak: number;
+  longestMakeStreak: number;
+};
+
+/** Summarizes a session from its shots in the order they were taken. Uncertain shots neither extend nor break a streak. */
+export function summarize(results: readonly ShotResult[]): SessionSummary {
+  const t = tally(results);
+  let current = 0;
+  let longest = 0;
+  for (const r of results) {
+    if (r === 'made') {
+      current += 1;
+      longest = Math.max(longest, current);
+    } else if (r === 'missed') {
+      current = 0;
+    }
+  }
+  return {
+    ...t,
+    attempts: t.made + t.missed,
+    fgPercentage: fieldGoalPercentage(t),
+    currentMakeStreak: current,
+    longestMakeStreak: longest,
+  };
+}
