@@ -219,6 +219,13 @@ describe('Home with a training plan', () => {
     expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
+  it('opens the progress screen', async () => {
+    await render(<Home />);
+    await fireEvent.press(await screen.findByLabelText('Progress'));
+    expect(mockPush).toHaveBeenCalledWith('/progress');
+    expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
   it('opens the list of plans', async () => {
     await render(<Home />);
     await fireEvent.press(await screen.findByLabelText('Training plans'));
