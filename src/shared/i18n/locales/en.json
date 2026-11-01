@@ -27,7 +27,9 @@
     "workoutRowLabel": "Workout, {{date}}, {{summary}}",
     "startError": "Could not start the session. Please try again.",
     "plans": "Training plans",
-    "progress": "Progress"
+    "progress": "Progress",
+    "settings": "Settings",
+    "greeting": "Hi, {{name}}"
   },
   "session": {
     "title": "Shooting session",
@@ -248,6 +250,35 @@
     "noValue": "—",
     "rowLabel": "{{name}}: {{value}}",
     "rowLabelDetail": "{{name}}: {{value}} ({{detail}})"
+  },
+  "profile": {
+    "nameTooLong": "Keep your name to {{max}} characters or fewer.",
+    "saveError": "Could not save that. Please try again."
+  },
+  "welcome": {
+    "title": "Welcome to HoopLog",
+    "intro": "Log your shooting and workouts, follow a weekly plan and watch your progress grow.",
+    "privacy": "No account needed. Everything you log stays on this phone.",
+    "nameLabel": "What should we call you?",
+    "nameHint": "Optional. You can change it later in Settings.",
+    "start": "Get started",
+    "skip": "Skip for now"
+  },
+  "settings": {
+    "title": "Settings",
+    "profileTitle": "Profile",
+    "nameLabel": "Your name",
+    "nameHint": "Shown on the home screen. Leave it blank to hide the greeting.",
+    "save": "Save name",
+    "saved": "Saved.",
+    "preferencesTitle": "Preferences",
+    "units": "Units",
+    "unitsValue": "Metric (kg, m, cm)",
+    "language": "Language",
+    "languageValue": "English",
+    "rowLabel": "{{name}}: {{value}}",
+    "dataTitle": "Your data",
+    "dataBody": "Everything you log is saved on this phone. No account is needed."
   },
   "measurement": {
     "reps": "Reps",

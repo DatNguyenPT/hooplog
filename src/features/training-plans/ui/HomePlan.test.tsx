@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import Home from '@/app/index';
+import type { ProfileRepository } from '@/features/profile/data/profileRepository';
 import type { PlanRepository } from '@/features/training-plans/data/planRepository';
 import type { ShootingRepository } from '@/features/shooting/data/shootingRepository';
 import type { Exercise } from '@/features/workouts/domain/exercise';
@@ -41,10 +42,18 @@ const mockShooting: jest.Mocked<ShootingRepository> = {
   listSessions: jest.fn(),
   shotsBetween: jest.fn(),
 };
+const mockProfile: jest.Mocked<ProfileRepository> = {
+  getProfile: jest.fn(),
+  saveDisplayName: jest.fn(),
+  completeOnboarding: jest.fn(),
+};
 const mockPush = jest.fn();
 
 jest.mock('@/features/training-plans/data/planRepository', () => ({
   usePlanRepository: () => mockPlans,
+}));
+jest.mock('@/features/profile/data/profileRepository', () => ({
+  useProfileRepository: () => mockProfile,
 }));
 jest.mock('@/features/workouts/data/workoutRepository', () => ({
   useWorkoutRepository: () => mockWorkouts,
@@ -120,6 +129,11 @@ beforeEach(() => {
     consoleError(...args);
   });
   jest.clearAllMocks();
+  // An existing player: the welcome screen is behind them.
+  mockProfile.getProfile.mockResolvedValue({
+    displayName: null,
+    onboardedAt: '2026-01-01T08:00:00.000Z',
+  });
   mockPlans.getActivePlan.mockResolvedValue(plan);
   mockShooting.listSessions.mockResolvedValue([]);
   mockShooting.getActiveSessionId.mockResolvedValue(null);
