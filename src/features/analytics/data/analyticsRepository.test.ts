@@ -38,7 +38,9 @@ const PLANK = '00000000-0000-4000-8000-000000000011'; // duration
 /** A fixed UTC instant in January 2026; later seconds keep rows in the order they were seeded. */
 const T = (day: number, hour = 12, second = 0) =>
   new Date(Date.UTC(2026, 0, day, hour, 0, second)).toISOString();
+/** A week: Monday 5 January up to, not including, Monday 12 January. */
 const FROM = T(5, 0);
+const TO = T(12, 0);
 
 type SeedSet = {
   exerciseId: string;
@@ -146,10 +148,10 @@ async function setup() {
   };
 }
 
-describe('analytics repository: weeklyInputs', () => {
+describe('analytics repository: inputsBetween', () => {
   it('is empty for a new database', async () => {
     const { repo } = await setup();
-    expect(await repo.weeklyInputs(FROM)).toEqual({ shots: [], sessionStarts: [], sets: [] });
+    expect(await repo.inputsBetween(FROM, TO)).toEqual({ shots: [], sessionStarts: [], sets: [] });
   });
 
   it('returns resolved shots from the window on, in the order taken', async () => {
@@ -162,7 +164,7 @@ describe('analytics repository: weeklyInputs', () => {
       { result: 'made', deleted: true },
       'missed',
     ]);
-    const { shots } = await repo.weeklyInputs(FROM);
+    const { shots } = await repo.inputsBetween(FROM, TO);
     expect(shots).toEqual([
       { takenAt: T(6, 12, 0), result: 'made' },
       { takenAt: T(6, 12, 1), result: 'missed' },
@@ -183,7 +185,7 @@ describe('analytics repository: weeklyInputs', () => {
     ]);
     workoutSession(T(7, 15), [{ exerciseId: SQUAT, reps: 5, weightKg: 100, deleted: true }]);
     workoutSession(T(10), [], { open: true });
-    const { sessionStarts } = await repo.weeklyInputs(FROM);
+    const { sessionStarts } = await repo.inputsBetween(FROM, TO);
     expect([...sessionStarts].sort()).toEqual([T(6), T(6, 15)]);
   });
 
@@ -197,11 +199,45 @@ describe('analytics repository: weeklyInputs', () => {
       { exerciseId: SQUAT, reps: 3, weightKg: 140, deleted: true },
       { exerciseId: SQUAT, reps: 8, weightKg: 0 },
     ]);
-    const { sets } = await repo.weeklyInputs(FROM);
+    const { sets } = await repo.inputsBetween(FROM, TO);
     expect(sets).toEqual([
       { loggedAt: T(6, 12, 0), reps: 5, weightKg: 100 },
       { loggedAt: T(6, 12, 4), reps: 8, weightKg: 0 },
     ]);
+  });
+
+  it('stops before the upper bound, which is not part of the window', async () => {
+    const { repo, shootingSession, workoutSession } = await setup();
+    shootingSession(T(6), ['made', 'missed', 'made']); // shots at 12:00:00, 12:00:01, 12:00:02
+    shootingSession(T(7), ['made']);
+    workoutSession(T(6, 15), [{ exerciseId: SQUAT, reps: 5, weightKg: 100 }]);
+    workoutSession(T(7, 15), [{ exerciseId: SQUAT, reps: 5, weightKg: 100 }]);
+
+    const week = await repo.inputsBetween(FROM, T(7, 12)); // a session at exactly 12:00 is out
+    expect(week.shots).toEqual([
+      { takenAt: T(6, 12, 0), result: 'made' },
+      { takenAt: T(6, 12, 1), result: 'missed' },
+      { takenAt: T(6, 12, 2), result: 'made' },
+    ]);
+    expect([...week.sessionStarts].sort()).toEqual([T(6), T(6, 15)]);
+    expect(week.sets).toEqual([{ loggedAt: T(6, 15, 0), reps: 5, weightKg: 100 }]);
+
+    // A bound in the middle of a session keeps the shots before it; the session itself still counts.
+    const cut = await repo.inputsBetween(FROM, T(6, 12, 2));
+    expect(cut.shots.map((s) => s.takenAt)).toEqual([T(6, 12, 0), T(6, 12, 1)]);
+    expect(cut.sessionStarts).toEqual([T(6)]);
+  });
+
+  it('can read a single day, such as today', async () => {
+    const { repo, shootingSession, workoutSession } = await setup();
+    shootingSession(T(5, 23), ['made']);
+    shootingSession(T(6, 9), ['made', 'missed']);
+    workoutSession(T(6, 18), [{ exerciseId: SQUAT, reps: 5, weightKg: 100 }]);
+    shootingSession(T(7, 0), ['made']);
+    const today = await repo.inputsBetween(T(6, 0), T(7, 0));
+    expect(today.shots).toHaveLength(2);
+    expect([...today.sessionStarts].sort()).toEqual([T(6, 9), T(6, 18)]);
+    expect(today.sets).toEqual([{ loggedAt: T(6, 18, 0), reps: 5, weightKg: 100 }]);
   });
 });
 

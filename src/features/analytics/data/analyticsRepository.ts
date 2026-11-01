@@ -3,15 +3,15 @@ import { useMemo } from 'react';
 
 import type { ShotResult } from '@/features/shooting/domain/stats';
 import { toExercise, type ExerciseRow } from '@/features/workouts/data/exerciseRepository';
-import type { LiftBest, SessionResults, WeeklyInputs } from '../domain/progress';
+import type { LiftBest, PeriodInputs, SessionResults } from '../domain/progress';
 
 /**
  * Read-only projections over the shooting and workout tables. Nothing is written or stored here:
  * every figure is derived from the logs (see docs/decisions/0006-analytics-derived-from-logs.md).
  */
 export interface AnalyticsRepository {
-  /** Logs from `fromIso` on that the weekly charts bucket by local week. */
-  weeklyInputs(fromIso: string): Promise<WeeklyInputs>;
+  /** Logs from `fromIso` up to, but not including, `toIso`, for the charts to bucket by local day or week. */
+  inputsBetween(fromIso: string, toIso: string): Promise<PeriodInputs>;
   /** The shots of every shooting session, oldest session first, for all-time shooting bests. */
   sessionResults(): Promise<SessionResults[]>;
   /** All-time best weight and reps per exercise, including exercises deleted since (history keeps them). */
@@ -20,31 +20,34 @@ export interface AnalyticsRepository {
 
 export function createAnalyticsRepository(db: SQLiteDatabase): AnalyticsRepository {
   return {
-    async weeklyInputs(fromIso) {
+    async inputsBetween(fromIso, toIso) {
+      // Timestamps are stored as UTC ISO strings of one fixed shape, so text comparison is time order.
       const [shots, sessions, sets] = await Promise.all([
         db.getAllAsync<{ taken_at: string; result: 'made' | 'missed' }>(
           `SELECT taken_at, result FROM shot
-           WHERE deleted_at IS NULL AND result IN ('made', 'missed') AND taken_at >= ?
+           WHERE deleted_at IS NULL AND result IN ('made', 'missed')
+             AND taken_at >= ? AND taken_at < ?
            ORDER BY taken_at, rowid`,
-          [fromIso],
+          [fromIso, toIso],
         ),
         // A session counts once it has something logged; an open one with no shots or sets yet does not.
         db.getAllAsync<{ started_at: string }>(
           `SELECT s.started_at FROM shooting_session s
-           WHERE s.deleted_at IS NULL AND s.started_at >= ?
+           WHERE s.deleted_at IS NULL AND s.started_at >= ? AND s.started_at < ?
              AND EXISTS (SELECT 1 FROM shot t WHERE t.session_id = s.id AND t.deleted_at IS NULL)
            UNION ALL
            SELECT w.started_at FROM workout_session w
-           WHERE w.deleted_at IS NULL AND w.started_at >= ?
+           WHERE w.deleted_at IS NULL AND w.started_at >= ? AND w.started_at < ?
              AND EXISTS (SELECT 1 FROM workout_set x WHERE x.session_id = w.id AND x.deleted_at IS NULL)`,
-          [fromIso, fromIso],
+          [fromIso, toIso, fromIso, toIso],
         ),
         // Only weighted sets add to volume, so the others are not fetched.
         db.getAllAsync<{ logged_at: string; reps: number; weight_kg: number }>(
           `SELECT logged_at, reps, weight_kg FROM workout_set
-           WHERE deleted_at IS NULL AND reps IS NOT NULL AND weight_kg IS NOT NULL AND logged_at >= ?
+           WHERE deleted_at IS NULL AND reps IS NOT NULL AND weight_kg IS NOT NULL
+             AND logged_at >= ? AND logged_at < ?
            ORDER BY logged_at, rowid`,
-          [fromIso],
+          [fromIso, toIso],
         ),
       ]);
       return {

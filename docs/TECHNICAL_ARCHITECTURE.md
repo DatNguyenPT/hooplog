@@ -62,7 +62,7 @@ Every table: `id` (client-generated UUID), `created_at`, `updated_at`, `deleted_
 - `workout_session`, `workout_set` (exercise, reps, weight kg, duration s, distance m)
 - `shooting_session` (date, location label optional, source: `manual` | `ai`)
 - `shot` (session, timestamp, result `made|missed|uncertain`, zone optional, `source` manual|ai, `confidence` nullable, `corrected` boolean)
-- Derived stats (FG%, volume, streaks, weekly charts, personal bests) are computed from rows, not stored, until performance needs otherwise (see ADR 0006).
+- Derived stats (FG%, volume, streaks, charts for a day, week, month or the last 8 weeks, personal bests) are computed from rows, not stored, until performance needs otherwise (see ADR 0006).
 
 The `shot` table already has `uncertain`, `source`, `confidence`, `corrected`, so AI results later need no schema redesign. No video columns; the POC may add an optional local clip path later.
 

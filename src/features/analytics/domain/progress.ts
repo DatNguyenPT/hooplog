@@ -1,83 +1,90 @@
 import { fieldGoalPercentage, summarize, type ShotResult } from '@/features/shooting/domain/stats';
-import { addDays, dayKey, startOfWeek } from '@/features/training-plans/domain/plan';
+import { dayKey, startOfDay, startOfWeek } from '@/features/training-plans/domain/plan';
 import type { Exercise, MeasurementType } from '@/features/workouts/domain/exercise';
 import { setVolume, type PersonalBest } from '@/features/workouts/domain/workout';
 
-/** How many calendar weeks (Monday to Sunday, local time) the weekly charts cover, the current one included. */
-export const WEEKS_SHOWN = 8;
+import type { PeriodLayout } from './period';
 
 /** A session needs this many resolved shots to count as a best FG%, so "1 of 1" cannot win. */
 export const MIN_ATTEMPTS_FOR_BEST = 20;
 
-// ---- Weekly series (derived from the logs, never stored) ----
+// ---- Period series (derived from the logs, never stored) ----
 
 export type ResolvedShot = { takenAt: string; result: 'made' | 'missed' };
 export type LoggedSet = { loggedAt: string; reps: number | null; weightKg: number | null };
 
-/** What the weekly charts read from the logs. Timestamps are ISO-8601 UTC strings. */
-export type WeeklyInputs = {
+/** What the charts read from the logs for one period. Timestamps are ISO-8601 UTC strings. */
+export type PeriodInputs = {
   shots: readonly ResolvedShot[];
   /** Start time of every shooting session that has a shot and every workout that has a set. */
   sessionStarts: readonly string[];
   sets: readonly LoggedSet[];
 };
 
-export type WeekStats = {
-  /** Local Monday 00:00. */
-  start: Date;
+export type Totals = {
   made: number;
   missed: number;
-  /** 0-100, or null when no shot was taken that week. */
+  /** 0-100, or null when no shot was taken. */
   fgPercentage: number | null;
-  /** Shooting sessions plus workouts that started that week. */
+  /** Shooting sessions plus workouts that started in the period. */
   sessions: number;
   /** Reps x weight over weighted sets; bodyweight, timed and distance sets add nothing. */
   volumeKg: number;
 };
 
-/** Local Monday 00:00 of the oldest week shown when `now` falls in the newest one. */
-export function firstWeekStart(now: Date, weeks: number = WEEKS_SHOWN): Date {
-  return addDays(startOfWeek(now), -7 * (weeks - 1));
-}
+/** The figures of one bar: a day, or a week in the trend. */
+export type BucketStats = Totals & {
+  /** Local midnight the bar starts at. */
+  start: Date;
+};
 
-/** One entry per week, oldest first. Entries outside the window (older, or dated after `now`'s week) are ignored. */
-export function buildWeeklyStats(
-  inputs: WeeklyInputs,
-  now: Date,
-  weeks: number = WEEKS_SHOWN,
-): WeekStats[] {
-  const first = firstWeekStart(now, weeks);
-  const stats: WeekStats[] = [];
-  const byKey = new Map<string, WeekStats>();
-  for (let i = 0; i < weeks; i += 1) {
-    const start = addDays(first, 7 * i);
-    const week: WeekStats = {
-      start,
-      made: 0,
-      missed: 0,
-      fgPercentage: null,
-      sessions: 0,
-      volumeKg: 0,
-    };
-    stats.push(week);
-    byKey.set(dayKey(start), week);
-  }
-  const weekOf = (iso: string) => byKey.get(dayKey(startOfWeek(new Date(iso))));
+export const hasActivity = (totals: Totals): boolean =>
+  totals.sessions > 0 || totals.made + totals.missed > 0 || totals.volumeKg > 0;
+
+/** One entry per bar of the layout, oldest first. Logs that fall in no bar are ignored. */
+export function buildBucketStats(
+  inputs: PeriodInputs,
+  layout: Pick<PeriodLayout, 'unit' | 'starts'>,
+): BucketStats[] {
+  const stats: BucketStats[] = layout.starts.map((start) => ({
+    start,
+    made: 0,
+    missed: 0,
+    fgPercentage: null,
+    sessions: 0,
+    volumeKg: 0,
+  }));
+  const byKey = new Map(stats.map((bucket) => [dayKey(bucket.start), bucket]));
+  const barStart = layout.unit === 'week' ? startOfWeek : startOfDay;
+  const bucketOf = (iso: string) => byKey.get(dayKey(barStart(new Date(iso))));
 
   for (const shot of inputs.shots) {
-    const week = weekOf(shot.takenAt);
-    if (week) week[shot.result] += 1;
+    const bucket = bucketOf(shot.takenAt);
+    if (bucket) bucket[shot.result] += 1;
   }
   for (const iso of inputs.sessionStarts) {
-    const week = weekOf(iso);
-    if (week) week.sessions += 1;
+    const bucket = bucketOf(iso);
+    if (bucket) bucket.sessions += 1;
   }
   for (const set of inputs.sets) {
-    const week = weekOf(set.loggedAt);
-    if (week) week.volumeKg += setVolume(set);
+    const bucket = bucketOf(set.loggedAt);
+    if (bucket) bucket.volumeKg += setVolume(set);
   }
-  for (const week of stats) week.fgPercentage = fieldGoalPercentage(week);
+  for (const bucket of stats) bucket.fgPercentage = fieldGoalPercentage(bucket);
   return stats;
+}
+
+/** The figures of the whole period: every bar added up. */
+export function sumStats(buckets: readonly BucketStats[]): Totals {
+  const totals: Totals = { made: 0, missed: 0, fgPercentage: null, sessions: 0, volumeKg: 0 };
+  for (const bucket of buckets) {
+    totals.made += bucket.made;
+    totals.missed += bucket.missed;
+    totals.sessions += bucket.sessions;
+    totals.volumeKg += bucket.volumeKg;
+  }
+  totals.fgPercentage = fieldGoalPercentage(totals);
+  return totals;
 }
 
 /**
@@ -176,16 +183,7 @@ export function liftRecords(
   return records.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** True when there is nothing to chart or rank yet, so the screen shows its empty state. */
-export function isEmptyProgress(
-  weeks: readonly WeekStats[],
-  shooting: ShootingBests,
-  lifts: readonly LiftRecord[],
-): boolean {
-  return (
-    weeks.every((w) => w.sessions === 0 && w.made + w.missed === 0 && w.volumeKg === 0) &&
-    shooting.bestSession === null &&
-    shooting.longestMakeStreak === 0 &&
-    lifts.length === 0
-  );
+/** True when no personal best exists yet: with no period activity either, the screen shows its empty state. */
+export function hasNoBests(shooting: ShootingBests, lifts: readonly LiftRecord[]): boolean {
+  return shooting.bestSession === null && shooting.longestMakeStreak === 0 && lifts.length === 0;
 }
