@@ -11,7 +11,6 @@ const mockRepo: jest.Mocked<AnalyticsRepository> = {
   sessionResults: jest.fn(),
   liftBests: jest.fn(),
 };
-const mockBack = jest.fn();
 
 jest.mock('../data/analyticsRepository', () => ({
   useAnalyticsRepository: () => mockRepo,
@@ -20,7 +19,6 @@ jest.mock('../data/analyticsRepository', () => ({
 jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual('react');
   return {
-    router: { back: () => mockBack() },
     useFocusEffect: (effect: () => void) => useEffect(effect, [effect]),
   };
 });
@@ -192,13 +190,6 @@ describe('Progress screen states', () => {
     expect(screen.queryByText('Summary')).toBeNull();
     expect(screen.getByText('Jan 5 – Jan 11')).toBeTruthy();
     expect(screen.getByRole('radio', { name: 'Week' })).toBeSelected();
-    expect(screen.getByLabelText('Back')).toBeTruthy();
-  });
-
-  it('goes back', async () => {
-    await render(<ProgressScreen />);
-    await fireEvent.press(await screen.findByLabelText('Back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });
 

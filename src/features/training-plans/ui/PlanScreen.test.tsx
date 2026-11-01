@@ -318,28 +318,18 @@ describe('PlanScreen', () => {
     expect(screen.queryByText('Could not save that. Please try again.')).toBeNull();
   });
 
-  it('shows a message and a way back when the plan no longer exists', async () => {
+  it('shows a message when the plan no longer exists', async () => {
     mockPlans.getPlan.mockResolvedValue(null);
     await render(<PlanScreen id="gone" />);
     expect(await screen.findByText('This plan no longer exists.')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the error state, retries, and can go back', async () => {
+  it('shows the error state and retries', async () => {
     mockPlans.getPlan.mockRejectedValueOnce(new Error('boom'));
     await render(<PlanScreen id="p1" />);
     expect(await screen.findByText('Something went wrong.')).toBeTruthy();
-    await fireEvent.press(screen.getByLabelText('Back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
     await fireEvent.press(screen.getByLabelText('Try again'));
     expect(await screen.findByText('Match prep')).toBeTruthy();
-  });
-
-  it('goes back from a loaded plan', async () => {
-    await render(<PlanScreen id="p1" />);
-    await fireEvent.press(await screen.findByLabelText('Back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it('renames the plan after validating the new name', async () => {

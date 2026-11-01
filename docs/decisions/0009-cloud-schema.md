@@ -1,0 +1,20 @@
+# 0009: Cloud schema is a per-player mirror of the on-phone tables
+
+Status: proposed (M1 slice 6 design). The SQL is in `supabase/migrations/` and has not been applied to the Supabase project. Waiting for the owner's review.
+
+**Context.** Once a player has an account ([0008](0008-optional-accounts-supabase-auth.md)), the cloud database holds the same data as the phone for that one player: shooting sessions and shots, exercises, workouts and sets, training plans and items, and the profile. The phone stays the source of truth ([0001](0001-local-first-data.md)); the cloud is a safe copy that sync (M4) reads and writes. The one hard requirement is that a player can never read or change another player's rows.
+
+**Decision.**
+- Same eight tables and column names as the phone (migrations 1 to 5), in the `public` schema, in five SQL files. A cloud table is a faithful copy, so sync code maps rows one to one and a new phone column means one matching cloud migration.
+- Every table has `user_id` (the owner, `references auth.users on delete cascade`). The primary key is `(user_id, id)`, where `id` is the same client-generated UUID the phone uses. Foreign keys are composite, `(user_id, parent_id)`, so a row can only point at a parent owned by the same player.
+- Row Level Security on every table, one policy for signed-in users: a row is readable and writable only when `user_id` is the caller. Signed-out users get nothing. Privileges are granted explicitly to `authenticated`, because since 2026-10-30 Supabase no longer exposes new tables automatically.
+- Types are converted where the phone is looser: ISO text becomes `timestamptz`, 0/1 becomes `boolean`, REAL becomes `double precision` (so numbers round-trip exactly), and enum-like text keeps its `CHECK`. All checks the phone has are copied. Free text gets a length cap a little above the app's limit, so the app can raise a limit slightly without a cloud migration.
+- `server_updated_at` is stamped by a trigger on every insert and update. Sync will pull "everything with a `server_updated_at` after my last cursor", which keeps working when a phone's clock is wrong. The phone's `updated_at` stays the tie-breaker (last write wins).
+- Built-in exercises are uploaded like any other row, with their fixed ids, one copy per player. That keeps one policy and lets foreign keys from sets and plan items work without a special case.
+- The "only one" rules (one open session, one open workout, one active plan, one profile, one item per exercise per day) are enforced on the phone only. A strict cloud would refuse the second row when two phones each created one while offline, and one refused row can stall a whole sync batch. Sync will repair such conflicts instead.
+- Every foreign key is `on delete cascade`, so deleting an account removes all its rows in any order. The app only soft-deletes, so this never fires in normal use. "Delete all data" will delete the player's cloud rows outright.
+- No trigger on `auth.users` and no auto-created profile: a failing trigger there can break sign-up. The profile row is created by the app, like on the phone.
+
+**Trade-offs.** Copying the phone one to one is the cheapest design to build and check, at the price of storing a few rows (20 built-in exercises) per player and of not using the database to enforce the one-at-a-time rules. Random UUIDs scatter inserts inside one player's slice of an index, which does not matter at thousands of rows per player. Any signed-in player can write unlimited rows; that is fine for a private beta, and quotas can be added if abuse appears. Soft-deleted rows stay in the cloud so other phones can learn about deletions; a cleanup job for old ones can come later.
+
+**Consequences.** The sync milestone may add a "newest write wins" guard to the trigger and a purge of old deleted rows. Reads must convert timestamps back to the phone's ISO format and booleans to 0/1 at the data edge, validated with Zod. Any new phone migration that adds or changes a column needs a matching file in `supabase/migrations/`.

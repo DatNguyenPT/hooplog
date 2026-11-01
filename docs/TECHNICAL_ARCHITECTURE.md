@@ -13,7 +13,7 @@ Since the app must work as a guest, the phone's own database is the source of tr
 | Complexity | Low | Auth, RLS rules, network states everywhere |
 | Later sync | Must be designed for (see below) | Already there |
 
-Trade-off: we must write sync later instead of getting it free. We reduce that cost now by making every table sync-ready (below). Supabase (Auth, Postgres, Storage) is introduced in its own milestone via an ADR.
+Trade-off: we must write sync later instead of getting it free. We reduce that cost now by making every table sync-ready (below). Supabase Auth is introduced in M1 slice 6 ([0008](decisions/0008-optional-accounts-supabase-auth.md)); the cloud tables are designed in [0009](decisions/0009-cloud-schema.md) and used by sync in M4.
 
 ## 2. Stack
 
@@ -29,7 +29,7 @@ Trade-off: we must write sync later instead of getting it free. We reduce that c
 | CI | GitHub Actions: lint, typecheck, test | Free for small projects |
 | Builds | Local Android builds and EAS free tier | Free tier queues are slower; acceptable |
 
-Not yet chosen (each needs an ADR): Supabase client, Vision Camera, ML runtime, ORM (plain SQL repositories are the default; Drizzle only if migrations get painful), crash reporting.
+Not yet chosen (each needs an ADR): Supabase client (proposed in 0008), Vision Camera, ML runtime, ORM (plain SQL repositories are the default; Drizzle only if migrations get painful), crash reporting.
 
 Expo Go cannot run custom native code, so we use **development builds** from the start. This costs a one-time Android Studio setup but avoids a painful switch when the camera arrives.
 
@@ -81,7 +81,7 @@ Migrations are versioned and forward-only, run on app start, and tested.
 
 ## 6. Future sync design (not built now)
 
-Supabase Auth + Postgres with Row Level Security so users only read their own rows. Sync is "last-write-wins by `updated_at`" per row, with soft deletes, which is adequate for single-user data on a few devices. Guest data is attached to the new account at sign-up. Storage is not used for video.
+Supabase Auth + Postgres with Row Level Security so users only read their own rows (accounts: [0008](decisions/0008-optional-accounts-supabase-auth.md); table design and RLS: [0009](decisions/0009-cloud-schema.md), which also pulls changes by a server-stamped `server_updated_at`, so the phone's clock is only the tie-breaker). Sync is "last-write-wins by `updated_at`" per row, with soft deletes, which is adequate for single-user data on a few devices. Guest data is attached to the new account at sign-up. Storage is not used for video.
 
 ## 7. AI architecture seam
 
