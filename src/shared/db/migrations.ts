@@ -145,4 +145,21 @@ export const migrations: Migration[] = [
       CREATE UNIQUE INDEX idx_plan_item_shooting_day ON plan_item(plan_id, weekday) WHERE kind = 'shooting' AND deleted_at IS NULL;
     `,
   },
+  {
+    version: 5,
+    sql: `
+      -- The player's profile: at most one row, created by the first save (reading never writes).
+      -- onboarded_at is when the welcome screen was completed or skipped.
+      -- Units and language are not stored yet: the app has one option of each, so settings show them rather than offer a choice.
+      CREATE TABLE profile (
+        id TEXT PRIMARY KEY NOT NULL,
+        display_name TEXT CHECK (display_name IS NULL OR length(display_name) BETWEEN 1 AND 40),
+        onboarded_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        deleted_at TEXT
+      );
+      CREATE UNIQUE INDEX idx_one_profile ON profile((1)) WHERE deleted_at IS NULL;
+    `,
+  },
 ];

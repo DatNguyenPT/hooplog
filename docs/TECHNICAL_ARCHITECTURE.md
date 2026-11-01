@@ -56,7 +56,7 @@ Dependency rule: `ui -> data/domain`, `data -> domain`, `domain -> nothing`. Scr
 
 Every table: `id` (client-generated UUID), `created_at`, `updated_at`, `deleted_at` (soft delete), and later `synced_at`/`user_id` (nullable now). These make future sync merge-friendly without a rewrite.
 
-- `profile` (single row: display name, unit and language preferences)
+- `profile` (single row: optional display name and when the welcome screen was completed; unit and language columns are added by a migration when a second option exists, see ADR 0007)
 - `exercise` (library item; built-in seed + user-created; category, measurement type)
 - `training_plan`, `plan_item` (weekly schedule: each item has an ISO weekday and its targets; no separate day table, see ADR 0005)
 - `workout_session`, `workout_set` (exercise, reps, weight kg, duration s, distance m)

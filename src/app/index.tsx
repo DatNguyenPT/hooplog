@@ -1,9 +1,11 @@
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { needsWelcome } from '@/features/profile/domain/profile';
+import { useProfile } from '@/features/profile/ui/useProfile';
 import {
   useShootingRepository,
   type SessionListItem,
@@ -56,6 +58,7 @@ export default function Home() {
     return { activity, activeShootingId, activeWorkoutId };
   }, [shooting, workouts]);
   const { state, reload } = useLoad(load);
+  const { state: profile } = useProfile();
   const busy = useRef(false);
   const [startFailed, setStartFailed] = useState(false);
 
@@ -85,13 +88,32 @@ export default function Home() {
       ? start(shooting.startOrResumeSession, 'shooting')
       : start(workouts.startOrResumeSession, 'workout', item.exercise.id);
 
+  // First run: the welcome screen comes first. If the profile cannot be read, Home still opens.
+  if (profile.status === 'ready' && needsWelcome(profile.data)) return <Redirect href="/welcome" />;
+  const greetingName = profile.status === 'ready' ? profile.data.displayName : null;
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        {t('home.title')}
-      </Text>
+      <View style={styles.header}>
+        <View style={styles.headerText}>
+          <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
+            {t('home.title')}
+          </Text>
+          {greetingName ? (
+            <Text style={[styles.greeting, { color: theme.textMuted }]}>
+              {t('home.greeting', { name: greetingName })}
+            </Text>
+          ) : null}
+        </View>
+        <Button
+          label={t('home.settings')}
+          variant="secondary"
+          onPress={() => router.push('/settings')}
+          fontSize={16}
+        />
+      </View>
 
-      {state.status === 'loading' ? (
+      {state.status === 'loading' || profile.status === 'loading' ? (
         <LoadingView />
       ) : state.status === 'error' ? (
         <ErrorView onRetry={reload} />
@@ -188,7 +210,17 @@ function SessionRow({ item }: { item: SessionListItem }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
-  title: { fontSize: 32, fontWeight: '800', marginTop: 8, marginBottom: 16 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  headerText: { flex: 1 },
+  title: { fontSize: 32, fontWeight: '800' },
+  greeting: { fontSize: 16, marginTop: 2 },
   cta: { minHeight: 64, marginBottom: 8 },
   links: { flexDirection: 'row', gap: 8, marginTop: 16 },
   link: { flex: 1 },
