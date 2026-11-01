@@ -26,7 +26,8 @@
     "workoutSetsVolume_other": "{{count}} sets, {{volume}}",
     "workoutRowLabel": "Workout, {{date}}, {{summary}}",
     "startError": "Could not start the session. Please try again.",
-    "plans": "Training plans"
+    "plans": "Training plans",
+    "progress": "Progress"
   },
   "session": {
     "title": "Shooting session",
@@ -190,6 +191,38 @@
     "loadError": "Could not load today's plan.",
     "startItem": "Start {{name}}, {{target}}",
     "startItemProgress": "Start {{name}}, {{target}}, {{progress}}"
+  },
+  "progress": {
+    "title": "Progress",
+    "emptyTitle": "No progress yet",
+    "emptyHint": "Log a shooting session or a workout and your weekly charts and personal bests will show up here.",
+    "weekOf": "Week of {{date}}",
+    "fgTitle": "Field goal % per week",
+    "fgValue": "{{week}}: {{fg}} ({{made}} of {{attempts}} shots)",
+    "fgNone": "{{week}}: no shots",
+    "fgEmpty": "Shoot a session and your weekly field goal % will show up here.",
+    "sessionsTitle": "Sessions per week",
+    "sessionsValue_one": "{{week}}: {{count}} session",
+    "sessionsValue_other": "{{week}}: {{count}} sessions",
+    "sessionsNone": "{{week}}: no sessions",
+    "sessionsEmpty": "Shooting sessions and workouts you log will show up here.",
+    "volumeTitle": "Weight lifted per week",
+    "volumeValue": "{{week}}: {{weight}} lifted",
+    "volumeNone": "{{week}}: no weighted sets",
+    "volumeEmpty": "Log sets with a weight and your weekly total will show up here. Bodyweight sets are not counted.",
+    "bestsTitle": "Personal bests",
+    "bestSession": "Best shooting session",
+    "bestSessionDetail": "{{made}} of {{attempts}} shots on {{date}}",
+    "bestSessionNone": "Take at least {{count}} shots in one session to set a best.",
+    "streak": "Longest make streak",
+    "streakDetail": "In a row, within one session",
+    "liftsTitle": "Lifts",
+    "liftReps_one": "{{count}} rep",
+    "liftReps_other": "{{count}} reps",
+    "liftsNone": "Log a lift to see your best weight or reps here.",
+    "noValue": "—",
+    "rowLabel": "{{name}}: {{value}}",
+    "rowLabelDetail": "{{name}}: {{value}} ({{detail}})"
   },
   "measurement": {
     "reps": "Reps",

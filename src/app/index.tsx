@@ -119,12 +119,20 @@ export default function Home() {
               />
               {startFailed ? <InlineError message={t('home.startError')} /> : null}
               <TodayPlan onStart={startPlanned} />
-              <Button
-                label={t('home.plans')}
-                variant="secondary"
-                onPress={() => router.push('/plans')}
-                style={styles.plans}
-              />
+              <View style={styles.links}>
+                <Button
+                  label={t('home.plans')}
+                  variant="secondary"
+                  onPress={() => router.push('/plans')}
+                  style={styles.link}
+                />
+                <Button
+                  label={t('home.progress')}
+                  variant="secondary"
+                  onPress={() => router.push('/progress')}
+                  style={styles.link}
+                />
+              </View>
               <Text accessibilityRole="header" style={[styles.section, { color: theme.textMuted }]}>
                 {t('home.recent')}
               </Text>
@@ -182,7 +190,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
   title: { fontSize: 32, fontWeight: '800', marginTop: 8, marginBottom: 16 },
   cta: { minHeight: 64, marginBottom: 8 },
-  plans: { marginTop: 16 },
+  links: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  link: { flex: 1 },
   section: { fontSize: 14, fontWeight: '700', marginTop: 24, marginBottom: 8 },
   list: { gap: 8, paddingBottom: 24 },
   row: {
