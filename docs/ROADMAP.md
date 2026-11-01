@@ -25,7 +25,7 @@ Build in vertical slices, each usable on its own:
 3. Exercise library + workout logging + history - 3 weeks
 4. Training plans + weekly schedule - 2 weeks
 5. Dashboard and analytics (FG% trend, consistency, volume) - 2 weeks
-6. Data export/import, delete-all, polish, accessibility - 1-2 weeks
+6. Data export/import, delete-all, polish, accessibility - 1-2 weeks. The owner added swipe-to-go-back and Supabase sign-up/sign-in (accounts only, no sync) to this slice on 2026-11-01 ([ADR 0008](decisions/0008-optional-accounts-supabase-auth.md))
 - **Exit:** MVP quality bar in PRODUCT_CONTEXT met; use it yourself for real training for at least 2 weeks.
 
 ### M1.5 Android closed beta: 3-4 weeks
@@ -40,7 +40,7 @@ Runs outside the app first (offline analysis of recorded video), then on a real 
 Camera screen, on-device detector, Uncertain handling, correction UI, session review, analytics split by manual vs AI. Ships behind a feature flag in the beta.
 
 ### M4 Accounts and sync: 4-6 weeks
-Supabase Auth, RLS, sync, guest-to-account migration, account deletion. Can move earlier or later depending on beta feedback (for example if users lose data).
+Sync, guest-to-account migration and the cloud tables with RLS (designed in [ADR 0009](decisions/0009-cloud-schema.md)). Sign-up, sign-in and account deletion moved into M1 slice 6. Can move earlier or later depending on beta feedback (for example if users lose data).
 
 ### M5 Expansion and iOS: open-ended
 Apple Developer account ($99/year), iOS build and testing, Vietnamese, recommendations, advanced analytics, premium split. Public launch decision.
@@ -51,7 +51,7 @@ Apple Developer account ($99/year), iOS build and testing, Vietnamese, recommend
 - M4 and M5 depend on beta feedback.
 
 ## Roadmap changes from the original proposal
-- Supabase moved from foundation to M4 (guest-first, zero cost).
+- Supabase moved from foundation to M4 (guest-first, zero cost). Its sign-up and sign-in part was pulled into M1 slice 6 on 2026-11-01; sync stays in M4.
 - Footage collection starts immediately; AI POC can start before MVP is finished.
 - Android closed beta added as an explicit milestone.
 - Data export added to the MVP because local-only data can be lost.

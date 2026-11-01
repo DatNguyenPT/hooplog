@@ -13,12 +13,12 @@ export function LoadingView() {
   );
 }
 
-export function ErrorView({ onRetry }: { onRetry: () => void }) {
+export function ErrorView({ onRetry, message }: { onRetry: () => void; message?: string }) {
   const { t } = useTranslation();
   const theme = useTheme();
   return (
     <View style={styles.center} accessibilityRole="alert">
-      <Text style={[styles.message, { color: theme.text }]}>{t('common.error')}</Text>
+      <Text style={[styles.message, { color: theme.text }]}>{message ?? t('common.error')}</Text>
       <Button label={t('common.retry')} onPress={onRetry} variant="secondary" />
     </View>
   );

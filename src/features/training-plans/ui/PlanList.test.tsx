@@ -18,7 +18,6 @@ const mockRepo: jest.Mocked<PlanRepository> = {
   removeItem: jest.fn(),
 };
 const mockPush = jest.fn();
-const mockBack = jest.fn();
 
 jest.mock('@/features/training-plans/data/planRepository', () => ({
   usePlanRepository: () => mockRepo,
@@ -27,7 +26,7 @@ jest.mock('@/features/training-plans/data/planRepository', () => ({
 jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual('react');
   return {
-    router: { push: (...args: unknown[]) => mockPush(...args), back: () => mockBack() },
+    router: { push: (...args: unknown[]) => mockPush(...args) },
     useFocusEffect: (effect: () => void) => useEffect(effect, [effect]),
   };
 });
@@ -84,12 +83,10 @@ describe('PlanList screen', () => {
     expect(screen.getByLabelText('New plan')).toBeTruthy();
   });
 
-  it('opens a plan and goes back', async () => {
+  it('opens a plan', async () => {
     await render(<PlanList />);
     await fireEvent.press(await screen.findByLabelText('Skills, 1 item'));
     expect(mockPush).toHaveBeenCalledWith('/plans/p2');
-    await fireEvent.press(screen.getByLabelText('Back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 
   it('validates the name, then creates the plan and opens it', async () => {
