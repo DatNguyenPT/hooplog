@@ -31,6 +31,8 @@ const BACKUP_NOTE =
   'Signing in does not back up your data yet. Your workouts, shooting and plans still live only on this phone. To keep a copy, export a backup from Settings, under Your data.';
 const NO_NETWORK = 'Could not reach the server. Check your internet connection and try again.';
 const UNKNOWN = 'Something went wrong. Please try again.';
+const MISMATCH = 'The passwords do not match.';
+const NEW_PASSWORD = 'long-enough-pass1';
 
 let emit: (user: AccountUser | null) => void = () => undefined;
 const unsubscribe = jest.fn();
@@ -60,6 +62,12 @@ afterEach(() => jest.restoreAllMocks());
 async function fillIn(email: string, password: string) {
   await fireEvent.changeText(await screen.findByLabelText('Email'), email);
   await fireEvent.changeText(screen.getByLabelText('Password'), password);
+}
+
+/** The sign-up form asks for the password twice; by default the second time matches the first. */
+async function fillInSignUp(email: string, password: string, confirmation = password) {
+  await fillIn(email, password);
+  await fireEvent.changeText(screen.getByLabelText('Confirm password'), confirmation);
 }
 
 describe('Account screen: availability and loading', () => {
@@ -126,6 +134,37 @@ describe('Account screen: signing in', () => {
     expect(mockRepo.signIn).not.toHaveBeenCalled();
   });
 
+  it('clears a message as soon as its field is fixed', async () => {
+    await render(<AccountScreen />);
+    await fireEvent.press(await screen.findByLabelText('Sign in'));
+    expect(screen.getByText('Enter your email.')).toBeTruthy();
+    expect(screen.getByText('Enter your password.')).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByLabelText('Email'), 'me@example.com');
+    expect(screen.queryByText('Enter your email.')).toBeNull();
+    expect(screen.getByText('Enter your password.')).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'x');
+    expect(screen.queryByText('Enter your password.')).toBeNull();
+  });
+
+  it('checks the email when the player leaves the field, not while they are still typing', async () => {
+    await render(<AccountScreen />);
+    const email = await screen.findByLabelText('Email');
+
+    // Leaving an empty field says nothing: tapping through the form should not nag.
+    await fireEvent(email, 'blur');
+    expect(screen.queryByText('Enter your email.')).toBeNull();
+
+    await fireEvent.changeText(screen.getByLabelText('Email'), 'me@example');
+    expect(screen.queryByText('Enter a valid email address.')).toBeNull();
+    await fireEvent(screen.getByLabelText('Email'), 'blur');
+    expect(screen.getByText('Enter a valid email address.')).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByLabelText('Email'), 'me@example.com');
+    expect(screen.queryByText('Enter a valid email address.')).toBeNull();
+  });
+
   it('signs in with the tidied email, empties the password, then shows the signed-in view', async () => {
     await render(<AccountScreen />);
     await fillIn('  me@example.com ', 'secret-pass');
@@ -141,6 +180,14 @@ describe('Account screen: signing in', () => {
     await act(async () => emit(player));
     expect(await screen.findByLabelText('Signed in as me@example.com')).toBeTruthy();
     expect(screen.queryByLabelText('Email')).toBeNull();
+  });
+
+  it('lets a short, simple password sign in: the new-password rules apply only when creating one', async () => {
+    await render(<AccountScreen />);
+    await fillIn('me@example.com', 'abc');
+    await fireEvent.press(screen.getByLabelText('Sign in'));
+    await waitFor(() => expect(mockRepo.signIn).toHaveBeenCalledTimes(1));
+    expect(mockRepo.signIn).toHaveBeenCalledWith({ email: 'me@example.com', password: 'abc' });
   });
 
   it('signs in from the keyboard Done key as well', async () => {
@@ -207,26 +254,141 @@ describe('Account screen: creating an account', () => {
     await fireEvent.press(await screen.findByLabelText('New here? Create an account'));
   };
 
-  it('asks for a long enough password and calls nothing until it has one', async () => {
+  it('asks for the password twice and lists the password rules, only when creating an account', async () => {
+    await render(<AccountScreen />);
+    await screen.findByLabelText('Email');
+    expect(screen.queryByLabelText('Confirm password')).toBeNull();
+    expect(screen.queryByLabelText('At least 8 characters: not yet')).toBeNull();
+
+    await openSignUp();
+    expect(screen.getByLabelText('Confirm password')).toBeTruthy();
+    expect(screen.getByLabelText('At least 8 characters: not yet')).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText('Confirm password'), 'typed-before-leaving');
+
+    await fireEvent.press(screen.getByLabelText('Already have an account? Sign in'));
+    expect(screen.queryByLabelText('Confirm password')).toBeNull();
+    expect(screen.queryByLabelText('At least 8 characters: not yet')).toBeNull();
+
+    // Coming back starts the second password field empty.
+    await openSignUp();
+    expect(screen.getByLabelText('Confirm password').props.value).toBe('');
+  });
+
+  it('ticks each password rule off as it is met', async () => {
     await render(<AccountScreen />);
     await openSignUp();
-    expect(screen.getByText('At least 8 characters.')).toBeTruthy();
+    expect(screen.getByLabelText('At least 8 characters: not yet')).toBeTruthy();
+    expect(screen.getByLabelText('A letter: not yet')).toBeTruthy();
+    expect(screen.getByLabelText('A number: not yet')).toBeTruthy();
 
-    await fillIn('me@example.com', 'short');
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'abc');
+    expect(screen.getByLabelText('At least 8 characters: not yet')).toBeTruthy();
+    expect(screen.getByLabelText('A letter: done')).toBeTruthy();
+    expect(screen.getByLabelText('A number: not yet')).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'abcdefg1');
+    expect(screen.getByLabelText('At least 8 characters: done')).toBeTruthy();
+    expect(screen.getByLabelText('A letter: done')).toBeTruthy();
+    expect(screen.getByLabelText('A number: done')).toBeTruthy();
+  });
+
+  it('names everything that is missing, and calls nothing, when the form is empty', async () => {
+    await render(<AccountScreen />);
+    await openSignUp();
+    await fireEvent.press(screen.getByLabelText('Create account'));
+    expect(screen.getByText('Enter your email.')).toBeTruthy();
+    expect(screen.getByText('Enter your password.')).toBeTruthy();
+    expect(screen.getByText('Enter your password again.')).toBeTruthy();
+    expect(mockRepo.signUp).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      problem: 'fewer than 8 characters',
+      password: 'short1',
+      message: 'Use at least 8 characters.',
+    },
+    { problem: 'no letter', password: '12345678', message: 'Add at least one letter.' },
+    { problem: 'no number', password: 'abcdefgh', message: 'Add at least one number.' },
+    {
+      problem: 'over 72 characters',
+      password: `${'a'.repeat(72)}1`,
+      message: 'Use 72 characters or fewer.',
+    },
+  ])('says what is wrong with a password with $problem, and calls nothing', async (row) => {
+    await render(<AccountScreen />);
+    await openSignUp();
+    await fillInSignUp('me@example.com', row.password);
+    await fireEvent.press(screen.getByLabelText('Create account'));
+    expect(screen.getByText(row.message)).toBeTruthy();
+    expect(mockRepo.signUp).not.toHaveBeenCalled();
+  });
+
+  it('says when the two passwords differ, and drops the message once they match', async () => {
+    await render(<AccountScreen />);
+    await openSignUp();
+    await fillInSignUp('me@example.com', NEW_PASSWORD, 'long-enough-pass2');
+    await fireEvent.press(screen.getByLabelText('Create account'));
+    expect(screen.getByText(MISMATCH)).toBeTruthy();
+    expect(mockRepo.signUp).not.toHaveBeenCalled();
+
+    await fireEvent.changeText(screen.getByLabelText('Confirm password'), NEW_PASSWORD);
+    expect(screen.queryByText(MISMATCH)).toBeNull();
+
+    await fireEvent.press(screen.getByLabelText('Create account'));
+    await waitFor(() => expect(mockRepo.signUp).toHaveBeenCalledTimes(1));
+  });
+
+  it('drops the mismatch message too when the first password is changed to match', async () => {
+    await render(<AccountScreen />);
+    await openSignUp();
+    await fillInSignUp('me@example.com', NEW_PASSWORD, 'long-enough-pass2');
+    await fireEvent.press(screen.getByLabelText('Create account'));
+    expect(screen.getByText(MISMATCH)).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'long-enough-pass2');
+    expect(screen.queryByText(MISMATCH)).toBeNull();
+  });
+
+  it('does not scold the password fields for being left; only sending the form does', async () => {
+    await render(<AccountScreen />);
+    await openSignUp();
+    await fireEvent.changeText(screen.getByLabelText('Password'), 'abc');
+    await fireEvent(screen.getByLabelText('Password'), 'blur');
+    await fireEvent(screen.getByLabelText('Confirm password'), 'blur');
+    expect(screen.queryByText('Use at least 8 characters.')).toBeNull();
+    expect(screen.queryByText('Enter your password again.')).toBeNull();
+
     await fireEvent.press(screen.getByLabelText('Create account'));
     expect(screen.getByText('Use at least 8 characters.')).toBeTruthy();
-    expect(mockRepo.signUp).not.toHaveBeenCalled();
+    expect(screen.getByText('Enter your password again.')).toBeTruthy();
+  });
+
+  it('shows and hides both password fields together', async () => {
+    await render(<AccountScreen />);
+    await openSignUp();
+    expect(screen.getByLabelText('Password').props.secureTextEntry).toBe(true);
+    expect(screen.getByLabelText('Confirm password').props.secureTextEntry).toBe(true);
+
+    await fireEvent.press(screen.getByLabelText('Show password'));
+    expect(screen.getByLabelText('Password').props.secureTextEntry).toBe(false);
+    expect(screen.getByLabelText('Confirm password').props.secureTextEntry).toBe(false);
+
+    await fireEvent.press(screen.getByLabelText('Hide password'));
+    expect(screen.getByLabelText('Password').props.secureTextEntry).toBe(true);
+    expect(screen.getByLabelText('Confirm password').props.secureTextEntry).toBe(true);
   });
 
   it('sends the sign-up and tells the player to check their email, without saying more', async () => {
     await render(<AccountScreen />);
     await openSignUp();
-    await fillIn(' me@example.com ', 'long-enough-pass');
+    await fillInSignUp(' me@example.com ', NEW_PASSWORD);
     await fireEvent.press(screen.getByLabelText('Create account'));
     expect(await screen.findByText('Check your email')).toBeTruthy();
+    // Only the email and the password go to the account service: not the second copy.
     expect(mockRepo.signUp).toHaveBeenCalledWith({
       email: 'me@example.com',
-      password: 'long-enough-pass',
+      password: NEW_PASSWORD,
     });
     expect(
       screen.getByText(
@@ -245,10 +407,14 @@ describe('Account screen: creating an account', () => {
     mockRepo.signUp.mockResolvedValue('signedIn');
     await render(<AccountScreen />);
     await openSignUp();
-    await fillIn('me@example.com', 'long-enough-pass');
+    await fillInSignUp('me@example.com', NEW_PASSWORD);
     await fireEvent.press(screen.getByLabelText('Create account'));
     await waitFor(() => expect(mockRepo.signUp).toHaveBeenCalledTimes(1));
     expect(screen.queryByText('Check your email')).toBeNull();
+
+    // Neither copy of the password is kept once it has been used.
+    await waitFor(() => expect(screen.getByLabelText('Password').props.value).toBe(''));
+    expect(screen.getByLabelText('Confirm password').props.value).toBe('');
 
     await act(async () => emit(player));
     expect(await screen.findByLabelText('Signed in as me@example.com')).toBeTruthy();
@@ -258,7 +424,7 @@ describe('Account screen: creating an account', () => {
     mockRepo.signUp.mockRejectedValueOnce(new AccountError('cannotCreate'));
     await render(<AccountScreen />);
     await openSignUp();
-    await fillIn('me@example.com', 'long-enough-pass');
+    await fillInSignUp('me@example.com', NEW_PASSWORD);
     await fireEvent.press(screen.getByLabelText('Create account'));
     expect(
       await screen.findByText(

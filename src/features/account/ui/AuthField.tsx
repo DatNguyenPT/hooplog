@@ -1,19 +1,23 @@
-import type { ReactNode } from 'react';
+import type { ComponentRef, ReactNode, Ref } from 'react';
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 
 import { InlineError } from '@/shared/ui/StateViews';
 import { useTheme } from '@/shared/ui/theme';
 
+/** What a ref to the field's input points at: the thing that can be focused. */
+export type AuthInput = ComponentRef<typeof TextInput>;
+
 type Props = TextInputProps & {
   label: string;
-  hint?: string;
   error: string | null;
+  /** Lets the form move on to the next field when the keyboard's Next key is pressed. */
+  inputRef?: Ref<AuthInput>;
   /** Sits at the end of the input, inside its border: for example a show/hide button. */
   trailing?: ReactNode;
 };
 
 /** A labelled text input for the sign-in form: no auto-capitalising or auto-correcting. */
-export function AuthField({ label, hint, error, trailing, ...input }: Props) {
+export function AuthField({ label, error, inputRef, trailing, ...input }: Props) {
   const theme = useTheme();
   return (
     <View style={styles.field}>
@@ -25,6 +29,7 @@ export function AuthField({ label, hint, error, trailing, ...input }: Props) {
         ]}
       >
         <TextInput
+          ref={inputRef}
           accessibilityLabel={label}
           autoCapitalize="none"
           autoCorrect={false}
@@ -33,7 +38,6 @@ export function AuthField({ label, hint, error, trailing, ...input }: Props) {
         />
         {trailing}
       </View>
-      {hint ? <Text style={[styles.hint, { color: theme.textMuted }]}>{hint}</Text> : null}
       {error ? <InlineError message={error} /> : null}
     </View>
   );
@@ -50,5 +54,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   input: { flex: 1, minHeight: 48, paddingHorizontal: 12, fontSize: 18 },
-  hint: { fontSize: 14 },
 });

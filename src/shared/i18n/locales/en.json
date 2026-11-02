@@ -294,7 +294,14 @@
     "signUpTitle": "Create an account",
     "emailLabel": "Email",
     "passwordLabel": "Password",
-    "passwordHint": "At least {{min}} characters.",
+    "confirmPasswordLabel": "Confirm password",
+    "rule": {
+      "length": "At least {{min}} characters",
+      "letter": "A letter",
+      "number": "A number",
+      "met": "{{rule}}: done",
+      "notMet": "{{rule}}: not yet"
+    },
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "show": "Show",
@@ -316,7 +323,12 @@
       "emailRequired": "Enter your email.",
       "emailInvalid": "Enter a valid email address.",
       "passwordRequired": "Enter your password.",
-      "passwordTooShort": "Use at least {{min}} characters."
+      "passwordTooShort": "Use at least {{min}} characters.",
+      "passwordTooLong": "Use {{max}} characters or fewer.",
+      "passwordNeedsLetter": "Add at least one letter.",
+      "passwordNeedsNumber": "Add at least one number.",
+      "confirmRequired": "Enter your password again.",
+      "confirmMismatch": "The passwords do not match."
     },
     "error": {
       "invalidCredentials": "That email and password do not match.",
