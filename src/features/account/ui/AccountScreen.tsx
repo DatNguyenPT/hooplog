@@ -32,7 +32,7 @@ export function AccountScreen() {
 function AccountContent() {
   const { t } = useTranslation();
   const theme = useTheme();
-  const { state, reload } = useAccount();
+  const { state, reload, deleted, markDeleted } = useAccount();
 
   if (state.status === 'loading') return <LoadingView />;
   if (state.status === 'error') {
@@ -47,7 +47,11 @@ function AccountContent() {
     >
       <Text style={[styles.body, { color: theme.textMuted }]}>{t('account.intro')}</Text>
       <Text style={[styles.body, { color: theme.textMuted }]}>{t('account.backupNote')}</Text>
-      {state.user ? <SignedInPanel user={state.user} /> : <SignedOutForm />}
+      {state.user ? (
+        <SignedInPanel user={state.user} onDeleted={markDeleted} />
+      ) : (
+        <SignedOutForm deleted={deleted} />
+      )}
     </ScrollView>
   );
 }

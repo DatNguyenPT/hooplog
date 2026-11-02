@@ -19,7 +19,9 @@ import {
 } from '../domain/account';
 import { AccountError, type AccountErrorKey } from '../domain/accountError';
 import { AuthField, type AuthInput } from './AuthField';
+import { DeletedNotice } from './DeletedNotice';
 import { PasswordRules } from './PasswordRules';
+import { PasswordToggle } from './PasswordToggle';
 
 type Mode = 'signIn' | 'signUp';
 
@@ -44,8 +46,11 @@ const CONFIRM_MESSAGES = {
  *
  * A field is only scolded once the player has left it (the email) or tried to submit. From then on
  * its message is re-checked as they type, so it goes away the moment the problem is fixed.
+ *
+ * `deleted` puts a short "your account was deleted" notice above the form, for the player who has
+ * just done that and landed back here.
  */
-export function SignedOutForm() {
+export function SignedOutForm({ deleted = false }: { deleted?: boolean }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const auth = useAuthRepository();
@@ -154,6 +159,7 @@ export function SignedOutForm() {
 
   return (
     <View style={styles.form}>
+      {deleted ? <DeletedNotice /> : null}
       <Text accessibilityRole="header" style={[styles.heading, { color: theme.text }]}>
         {signingUp ? t('account.signUpTitle') : t('account.signInTitle')}
       </Text>
@@ -193,18 +199,10 @@ export function SignedOutForm() {
               : null
           }
           trailing={
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                showPassword ? t('account.hidePassword') : t('account.showPassword')
-              }
-              onPress={() => setShowPassword((shown) => !shown)}
-              style={styles.toggle}
-            >
-              <Text style={[styles.toggleText, { color: theme.primary }]}>
-                {showPassword ? t('account.hide') : t('account.show')}
-              </Text>
-            </Pressable>
+            <PasswordToggle
+              shown={showPassword}
+              onToggle={() => setShowPassword((shown) => !shown)}
+            />
           }
         />
         {signingUp ? <PasswordRules password={password} /> : null}
@@ -249,14 +247,6 @@ const styles = StyleSheet.create({
   group: { gap: 8 },
   heading: { fontSize: 20, fontWeight: '700' },
   body: { fontSize: 16, lineHeight: 24 },
-  toggle: {
-    minHeight: 48,
-    minWidth: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  toggleText: { fontSize: 16, fontWeight: '700' },
   link: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
   linkText: { fontSize: 16, fontWeight: '600' },
 });

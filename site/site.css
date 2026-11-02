@@ -1,0 +1,138 @@
+/* Shared by every page in site/. Kept in a file of its own so the pages can forbid inline styles. */
+:root {
+  --background: #ffffff;
+  --surface: #f2f3f5;
+  --text: #111418;
+  --muted: #5b6470;
+  --primary: #c2410c;
+  --made: #1b7a3a;
+  --missed: #b3261e;
+  --on-status: #ffffff;
+  --border: #d9dce1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #101215;
+    --surface: #1b1e23;
+    --text: #f2f3f5;
+    --muted: #a3abb7;
+    --primary: #ff8a3d;
+    --made: #2fa354;
+    --missed: #e0584f;
+    --border: #2d3138;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--background);
+  color: var(--text);
+  font:
+    16px/1.5 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+main {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  text-align: center;
+}
+
+/* Pages that explain something: left-aligned and a little wider than a one-line result. */
+main.article {
+  max-width: 520px;
+  text-align: left;
+}
+
+.brand {
+  margin: 0 0 24px;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.icon {
+  display: block;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+}
+
+.icon circle {
+  fill: var(--made);
+}
+
+.icon.problem circle {
+  fill: var(--missed);
+}
+
+.icon path {
+  fill: none;
+  stroke: var(--on-status);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+h2 {
+  margin: 24px 0 8px;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+}
+
+p + p {
+  margin-top: 12px;
+}
+
+ol,
+ul {
+  margin: 0;
+  padding-left: 22px;
+  color: var(--muted);
+}
+
+li + li {
+  margin-top: 4px;
+}
+
+strong {
+  color: var(--text);
+}
+
+a {
+  color: var(--primary);
+}
+
+[hidden] {
+  display: none !important;
+}

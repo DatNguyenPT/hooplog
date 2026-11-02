@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Nothing here talks to any server: no fonts, no images, no analytics, no cookies. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="../site.css" />
+    <title>HoopLog: email confirmation</title>
+  </head>
+  <body>
+    <!--
+      Where the confirmation email sends the player: the app asks for this address when it signs
+      someone up. The same page is also at the top of the site, see index.html.
+      pages.test.js keeps the two in step.
+    -->
+    <main>
+      <p class="brand">HoopLog</p>
+
+      <!-- landing.js shows exactly one of these three, depending on what Supabase put in the address. -->
+      <section id="confirmed" hidden>
+        <svg class="icon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <circle cx="32" cy="32" r="30" />
+          <path d="M19 33l9 9 17-19" />
+        </svg>
+        <h1>Email confirmed</h1>
+        <p>
+          Your HoopLog account is ready. Go back to the app on your phone and sign in with your
+          email and password.
+        </p>
+      </section>
+
+      <section id="problem" hidden>
+        <svg class="icon problem" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <circle cx="32" cy="32" r="30" />
+          <path d="M32 18v17M32 45v1" />
+        </svg>
+        <h1>This link didn't work</h1>
+        <p>
+          It may have expired, or it may already have been used. If you have already confirmed your
+          email, open HoopLog and sign in.
+        </p>
+      </section>
+
+      <section id="nothing" hidden>
+        <h1>Nothing to confirm here</h1>
+        <p>Open HoopLog on your phone to sign in or create an account.</p>
+      </section>
+
+      <noscript>
+        <h1>HoopLog</h1>
+        <p>
+          If you came here from a confirmation email, your email may already be confirmed. Open
+          HoopLog on your phone and sign in.
+        </p>
+      </noscript>
+    </main>
+    <script src="../landing.js"></script>
+  </body>
+</html>

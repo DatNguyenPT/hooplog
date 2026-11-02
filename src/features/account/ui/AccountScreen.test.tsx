@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 
 import type { AuthRepository } from '@/features/account/data/authRepository';
 import '@/shared/i18n';
@@ -472,40 +471,180 @@ describe('Account screen: signed in', () => {
     expect(screen.getByLabelText('Sign out')).not.toBeDisabled();
   });
 
-  it('asks before deleting the account, and deletes nothing when the player cancels', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  it('says nothing about a deleted account after a plain sign-out', async () => {
     await render(<AccountScreen />);
-    await fireEvent.press(await screen.findByLabelText('Delete account'));
-    expect(alertSpy).toHaveBeenCalledTimes(1);
-    expect(alertSpy.mock.calls[0]?.[0]).toBe('Delete your account?');
-    expect(alertSpy.mock.calls[0]?.[1]).toContain('are not deleted');
-    expect(mockRepo.deleteAccount).not.toHaveBeenCalled();
+    await screen.findByLabelText('Sign out');
+    await act(async () => emit(null));
+    expect(await screen.findByLabelText('Email')).toBeTruthy();
+    expect(screen.queryByText('Account deleted')).toBeNull();
+  });
+});
 
-    const buttons = alertSpy.mock.calls[0]?.[2] ?? [];
-    expect(buttons.find((button) => button.style === 'cancel')?.onPress).toBeUndefined();
+describe('Account screen: deleting the account', () => {
+  const CONFIRM = 'Yes, delete my account';
+  const WHAT_STAYS = /are not deleted/;
+  const DELETED_BODY =
+    'Your account and anything stored with it online were removed. Your workouts, shooting and plans on this phone are still here.';
+
+  beforeEach(() => mockRepo.getUser.mockResolvedValue(player));
+
+  const openForm = async () => {
+    await fireEvent.press(await screen.findByLabelText('Delete account'));
+  };
+  const typePassword = (password: string) =>
+    fireEvent.changeText(screen.getByLabelText('Password'), password);
+
+  it('asks for the password first, and deletes nothing when the player cancels', async () => {
+    await render(<AccountScreen />);
+    await openForm();
+    expect(screen.getByText('Delete your account?')).toBeTruthy();
+    expect(screen.getByText(WHAT_STAYS)).toBeTruthy();
+    expect(screen.getByText('Enter your password to confirm. This cannot be undone.')).toBeTruthy();
+    expect(screen.getByLabelText('Password')).toBeTruthy();
+    // The form takes the place of the two buttons, so a stray tap cannot reach either of them.
+    expect(screen.queryByLabelText('Sign out')).toBeNull();
+    expect(screen.queryByLabelText('Delete account')).toBeNull();
+
+    await fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByLabelText('Password')).toBeNull();
+    expect(screen.getByLabelText('Sign out')).toBeTruthy();
+    expect(screen.getByLabelText('Delete account')).toBeTruthy();
     expect(mockRepo.deleteAccount).not.toHaveBeenCalled();
   });
 
-  it('deletes the account once the player confirms', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  it('calls nothing without a password, and drops the message once one is typed', async () => {
     await render(<AccountScreen />);
-    await fireEvent.press(await screen.findByLabelText('Delete account'));
-    const confirm = (alertSpy.mock.calls[0]?.[2] ?? []).find((b) => b.style === 'destructive');
-    await act(async () => confirm?.onPress?.());
+    await openForm();
+    await fireEvent.press(screen.getByLabelText(CONFIRM));
+    expect(screen.getByText('Enter your password.')).toBeTruthy();
+    expect(mockRepo.deleteAccount).not.toHaveBeenCalled();
+
+    await typePassword('x');
+    expect(screen.queryByText('Enter your password.')).toBeNull();
+  });
+
+  it('deletes the account with the password the player typed', async () => {
+    await render(<AccountScreen />);
+    await openForm();
+    await typePassword('secret-pass');
+    await fireEvent.press(screen.getByLabelText(CONFIRM));
+    await waitFor(() => expect(mockRepo.deleteAccount).toHaveBeenCalledTimes(1));
+    expect(mockRepo.deleteAccount).toHaveBeenCalledWith('secret-pass');
+  });
+
+  it('deletes from the keyboard Done key as well', async () => {
+    await render(<AccountScreen />);
+    await openForm();
+    await typePassword('secret-pass');
+    await fireEvent(screen.getByLabelText('Password'), 'submitEditing');
     await waitFor(() => expect(mockRepo.deleteAccount).toHaveBeenCalledTimes(1));
   });
 
-  it('says so when the account cannot be deleted yet, and stays signed in', async () => {
-    mockRepo.deleteAccount.mockRejectedValueOnce(new AccountError('notAvailable'));
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  it('says the account is gone, even though the sign-out arrives before the call returns', async () => {
+    let finish!: () => void;
+    mockRepo.deleteAccount.mockReturnValue(new Promise<void>((r) => (finish = r)));
     await render(<AccountScreen />);
-    await fireEvent.press(await screen.findByLabelText('Delete account'));
-    const confirm = (alertSpy.mock.calls[0]?.[2] ?? []).find((b) => b.style === 'destructive');
-    await act(async () => confirm?.onPress?.());
-    expect(
-      await screen.findByText('This is not available yet. Please try again later.'),
-    ).toBeTruthy();
+    await openForm();
+    await typePassword('secret-pass');
+    // Not awaited: the press resolves only when deleting has finished.
+    const press = fireEvent.press(screen.getByLabelText(CONFIRM));
+    await waitFor(() => expect(mockRepo.deleteAccount).toHaveBeenCalledTimes(1));
+
+    // The account service signs this phone out as part of deleting, before the call comes back.
+    await act(async () => emit(null));
+    expect(await screen.findByLabelText('Email')).toBeTruthy();
+
+    await act(async () => finish());
+    await press;
+    expect(await screen.findByText('Account deleted')).toBeTruthy();
+    expect(screen.getByText(DELETED_BODY)).toBeTruthy();
+    expect(screen.getByLabelText('Sign in')).toBeTruthy();
+  });
+
+  it('stops saying the account was deleted once someone signs in again', async () => {
+    await render(<AccountScreen />);
+    await openForm();
+    await typePassword('secret-pass');
+    await fireEvent.press(screen.getByLabelText(CONFIRM));
+    await act(async () => emit(null));
+    expect(await screen.findByText('Account deleted')).toBeTruthy();
+
+    await act(async () => emit(player));
+    expect(await screen.findByLabelText('Signed in as me@example.com')).toBeTruthy();
+    expect(screen.queryByText('Account deleted')).toBeNull();
+
+    await act(async () => emit(null));
+    expect(await screen.findByLabelText('Email')).toBeTruthy();
+    expect(screen.queryByText('Account deleted')).toBeNull();
+  });
+
+  it('says the password is wrong, keeps the account, and drops the message when it is retyped', async () => {
+    mockRepo.deleteAccount.mockRejectedValueOnce(new AccountError('wrongPassword'));
+    await render(<AccountScreen />);
+    await openForm();
+    await typePassword('not-it');
+    await fireEvent.press(screen.getByLabelText(CONFIRM));
+    expect(await screen.findByText('That password is not right.')).toBeTruthy();
     expect(screen.getByLabelText('Signed in as me@example.com')).toBeTruthy();
+    expect(screen.getByLabelText(CONFIRM)).not.toBeDisabled();
+
+    await typePassword('not-it-either');
+    expect(screen.queryByText('That password is not right.')).toBeNull();
+  });
+
+  it.each([
+    {
+      reason: 'the service is not ready',
+      error: new AccountError('notAvailable'),
+      message: 'This is not available yet. Please try again later.',
+    },
+    { reason: 'there is no connection', error: new AccountError('network'), message: NO_NETWORK },
+    { reason: 'it fails in a way it does not know', error: new Error('boom'), message: UNKNOWN },
+  ])('says so, and stays signed in, when $reason', async ({ error, message }) => {
+    mockRepo.deleteAccount.mockRejectedValueOnce(error);
+    await render(<AccountScreen />);
+    await openForm();
+    await typePassword('secret-pass');
+    await fireEvent.press(screen.getByLabelText(CONFIRM));
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(screen.getByLabelText('Signed in as me@example.com')).toBeTruthy();
+    expect(screen.getByLabelText(CONFIRM)).not.toBeDisabled();
+
+    // Cancelling takes the message away with the form, and the two buttons come back.
+    await fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByText(message)).toBeNull();
     expect(screen.getByLabelText('Delete account')).not.toBeDisabled();
+  });
+
+  it('ignores a second tap while deleting', async () => {
+    let finish!: () => void;
+    mockRepo.deleteAccount.mockReturnValue(new Promise<void>((r) => (finish = r)));
+    await render(<AccountScreen />);
+    await openForm();
+    await typePassword('secret-pass');
+    // Not awaited: the press resolves only when deleting has finished.
+    const firstPress = fireEvent.press(screen.getByLabelText(CONFIRM));
+    await waitFor(() => expect(mockRepo.deleteAccount).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText(CONFIRM)).toBeDisabled();
+    expect(screen.getByLabelText('Cancel')).toBeDisabled();
+
+    await fireEvent.press(screen.getByLabelText(CONFIRM));
+    expect(mockRepo.deleteAccount).toHaveBeenCalledTimes(1);
+
+    await act(async () => finish());
+    await firstPress;
+    expect(screen.getByLabelText(CONFIRM)).not.toBeDisabled();
+  });
+
+  it('hides the password until asked, and hides it again', async () => {
+    await render(<AccountScreen />);
+    await openForm();
+    expect(screen.getByLabelText('Password').props.secureTextEntry).toBe(true);
+
+    await fireEvent.press(screen.getByLabelText('Show password'));
+    expect(screen.getByLabelText('Password').props.secureTextEntry).toBe(false);
+
+    await fireEvent.press(screen.getByLabelText('Hide password'));
+    expect(screen.getByLabelText('Password').props.secureTextEntry).toBe(true);
   });
 });

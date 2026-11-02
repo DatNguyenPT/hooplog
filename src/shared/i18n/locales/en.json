@@ -319,6 +319,10 @@
     "deleteAccount": "Delete account",
     "deleteTitle": "Delete your account?",
     "deleteBody": "This removes your account and anything stored with it online. Your workouts, shooting and plans on this phone are not deleted.",
+    "deleteConfirmHint": "Enter your password to confirm. This cannot be undone.",
+    "deleteConfirm": "Yes, delete my account",
+    "deletedTitle": "Account deleted",
+    "deletedBody": "Your account and anything stored with it online were removed. Your workouts, shooting and plans on this phone are still here.",
     "fieldError": {
       "emailRequired": "Enter your email.",
       "emailInvalid": "Enter a valid email address.",
@@ -332,6 +336,7 @@
     },
     "error": {
       "invalidCredentials": "That email and password do not match.",
+      "wrongPassword": "That password is not right.",
       "emailNotConfirmed": "Confirm your email first: open the link we sent you, then sign in.",
       "cannotCreate": "Could not create that account. If you already have one, try signing in.",
       "weakPassword": "Choose a stronger password.",
