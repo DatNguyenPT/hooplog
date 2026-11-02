@@ -46,7 +46,7 @@ src/shared/
   ui/                      design system: tokens, Button, Card, EmptyState, ErrorState, Skeleton
   i18n/  units/  utils/
 docs/decisions/            ADRs, one short file per significant decision
-site/                      static web pages published with GitHub Pages (email confirmation page, 0011)
+site/                      static web pages published with GitHub Pages (confirm and delete-account pages, 0011, 0012)
 ```
 
 Features: `training-plans`, `workouts`, `shooting`, `analytics`, `profile`, later `ai-camera`, `sync`.
@@ -82,7 +82,7 @@ Migrations are versioned and forward-only, run on app start, and tested.
 
 ## 6. Future sync design (not built now)
 
-Supabase Auth + Postgres with Row Level Security so users only read their own rows (accounts: [0008](decisions/0008-optional-accounts-supabase-auth.md); table design and RLS: [0009](decisions/0009-cloud-schema.md), which also pulls changes by a server-stamped `server_updated_at`, so the phone's clock is only the tie-breaker). Sync is "last-write-wins by `updated_at`" per row, with soft deletes, which is adequate for single-user data on a few devices. Guest data is attached to the new account at sign-up. Storage is not used for video.
+Supabase Auth + Postgres with Row Level Security so users only read their own rows (accounts: [0008](decisions/0008-optional-accounts-supabase-auth.md); table design and RLS: [0009](decisions/0009-cloud-schema.md), which also pulls changes by a server-stamped `server_updated_at`, so the phone's clock is only the tie-breaker). Sync is "last-write-wins by `updated_at`" per row, with soft deletes, which is adequate for single-user data on a few devices. Guest data is attached to the new account at sign-up. Storage is not used for video. Once an account holds data, the `delete-account` function must check the password (or a very recent sign-in) itself instead of trusting the app to have asked ([0012](decisions/0012-site-pages-and-account-deletion.md)).
 
 ## 7. AI architecture seam
 

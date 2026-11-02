@@ -1,6 +1,7 @@
 /** Why an account action failed, in terms the screen has a message for. */
 export type AccountErrorKey =
   | 'invalidCredentials'
+  | 'wrongPassword'
   | 'emailNotConfirmed'
   | 'cannotCreate'
   | 'weakPassword'

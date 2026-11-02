@@ -17,7 +17,15 @@ const functions = { invoke: jest.fn() };
 const repo = createAuthRepository(() => ({ auth, functions }) as unknown as SupabaseClient);
 
 const credentials = { email: 'dat@example.com', password: 'correct horse' };
-const user = { id: 'u1', email: 'dat@example.com', app_metadata: {}, user_metadata: {} };
+const user = {
+  id: 'u1',
+  email: 'dat@example.com',
+  email_confirmed_at: '2026-11-02T08:00:00Z',
+  app_metadata: {},
+  user_metadata: {},
+};
+// An account whose confirmation link nobody has followed yet.
+const unconfirmed = { ...user, email_confirmed_at: undefined };
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -53,6 +61,17 @@ describe('getUser', () => {
     await expect(repo.getUser()).resolves.toEqual({ id: 'u1', email: null });
   });
 
+  it('does not count a stored sign-in whose email was never confirmed', async () => {
+    auth.getSession.mockResolvedValue({ data: { session: { user: unconfirmed } }, error: null });
+    await expect(repo.getUser()).resolves.toBeNull();
+  });
+
+  it('accepts the older confirmation field too', async () => {
+    const older = { ...unconfirmed, confirmed_at: '2026-11-02T08:00:00Z' };
+    auth.getSession.mockResolvedValue({ data: { session: { user: older } }, error: null });
+    await expect(repo.getUser()).resolves.toEqual({ id: 'u1', email: 'dat@example.com' });
+  });
+
   it('fails with the reason when the stored sign-in cannot be read', async () => {
     auth.getSession.mockResolvedValue({
       data: { session: null },
@@ -80,18 +99,71 @@ describe('onChange', () => {
     stop();
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
+
+  it('reports a sign-in with an unconfirmed email as nobody being signed in', () => {
+    let emit!: (event: string, session: unknown) => void;
+    auth.onAuthStateChange.mockImplementation((callback) => {
+      emit = callback;
+      return { data: { subscription: { unsubscribe: jest.fn() } } };
+    });
+    const listener = jest.fn();
+
+    repo.onChange(listener);
+    emit('SIGNED_IN', { user: unconfirmed });
+    expect(listener.mock.calls).toEqual([[null]]);
+  });
 });
 
 describe('signUp', () => {
   it('says the confirmation email was sent when there is no session yet', async () => {
     auth.signUp.mockResolvedValue({ data: { user, session: null }, error: null });
     await expect(repo.signUp(credentials)).resolves.toBe('confirmationSent');
-    expect(auth.signUp).toHaveBeenCalledWith(credentials);
+  });
+
+  it('asks for the confirmation link to land on the confirm page of the site', async () => {
+    auth.signUp.mockResolvedValue({ data: { user, session: null }, error: null });
+    await repo.signUp(credentials);
+    expect(auth.signUp).toHaveBeenCalledWith({
+      ...credentials,
+      options: { emailRedirectTo: 'https://datnguyenpt.github.io/hooplog/confirm/' },
+    });
+  });
+
+  it('sends the link to another site when the build is set up for one', async () => {
+    const elsewhere = createAuthRepository(
+      () => ({ auth, functions }) as unknown as SupabaseClient,
+      'https://hooplog.example',
+    );
+    auth.signUp.mockResolvedValue({ data: { user, session: null }, error: null });
+    await elsewhere.signUp(credentials);
+    expect(auth.signUp).toHaveBeenCalledWith({
+      ...credentials,
+      options: { emailRedirectTo: 'https://hooplog.example/confirm/' },
+    });
   });
 
   it('says the player is signed in when the project does not ask for confirmation', async () => {
     auth.signUp.mockResolvedValue({ data: { user, session: { user } }, error: null });
     await expect(repo.signUp(credentials)).resolves.toBe('signedIn');
+    expect(auth.signOut).not.toHaveBeenCalled();
+  });
+
+  it('does not sign in an address nobody has confirmed, even when the project hands out a session', async () => {
+    auth.signUp.mockResolvedValue({
+      data: { user: unconfirmed, session: { user: unconfirmed } },
+      error: null,
+    });
+    await expect(repo.signUp(credentials)).resolves.toBe('confirmationSent');
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it('still asks for the confirmation when clearing that session fails', async () => {
+    auth.signUp.mockResolvedValue({
+      data: { user: unconfirmed, session: { user: unconfirmed } },
+      error: null,
+    });
+    auth.signOut.mockResolvedValue({ error: { name: 'AuthRetryableFetchError', status: 0 } });
+    await expect(repo.signUp(credentials)).resolves.toBe('confirmationSent');
   });
 
   it('fails with the reason the server gave', async () => {
@@ -108,6 +180,7 @@ describe('signIn', () => {
     auth.signInWithPassword.mockResolvedValue({ data: { user, session: {} }, error: null });
     await expect(repo.signIn(credentials)).resolves.toBeUndefined();
     expect(auth.signInWithPassword).toHaveBeenCalledWith(credentials);
+    expect(auth.signOut).not.toHaveBeenCalled();
   });
 
   it('fails with the reason the server gave', async () => {
@@ -116,6 +189,24 @@ describe('signIn', () => {
       error: { name: 'AuthApiError', code: 'invalid_credentials', status: 400 },
     });
     expect((await rejection(repo.signIn(credentials))).key).toBe('invalidCredentials');
+  });
+
+  it('refuses an account whose email was never confirmed, and signs out again', async () => {
+    auth.signInWithPassword.mockResolvedValue({
+      data: { user: unconfirmed, session: { user: unconfirmed } },
+      error: null,
+    });
+    expect((await rejection(repo.signIn(credentials))).key).toBe('emailNotConfirmed');
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it('still says the email is unconfirmed when signing out again fails', async () => {
+    auth.signInWithPassword.mockResolvedValue({
+      data: { user: unconfirmed, session: { user: unconfirmed } },
+      error: null,
+    });
+    auth.signOut.mockResolvedValue({ error: { name: 'AuthRetryableFetchError', status: 0 } });
+    expect((await rejection(repo.signIn(credentials))).key).toBe('emailNotConfirmed');
   });
 });
 
@@ -132,11 +223,61 @@ describe('signOut', () => {
 });
 
 describe('deleteAccount', () => {
-  it('asks the cloud function to remove the account, then signs out here', async () => {
+  beforeEach(() => {
+    auth.getSession.mockResolvedValue({ data: { session: { user } }, error: null });
+    auth.signInWithPassword.mockResolvedValue({ data: { user, session: {} }, error: null });
     functions.invoke.mockResolvedValue({ data: { deleted: true }, error: null });
-    await repo.deleteAccount();
+  });
+
+  it('checks the password, asks the cloud function to remove the account, then signs out here', async () => {
+    await repo.deleteAccount('correct horse');
+    expect(auth.signInWithPassword).toHaveBeenCalledWith({
+      email: 'dat@example.com',
+      password: 'correct horse',
+    });
     expect(functions.invoke).toHaveBeenCalledWith('delete-account', { method: 'POST' });
     expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  });
+
+  it('removes nothing, and stays signed in, when the password is wrong', async () => {
+    auth.signInWithPassword.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { name: 'AuthApiError', code: 'invalid_credentials', status: 400 },
+    });
+    expect((await rejection(repo.deleteAccount('nope'))).key).toBe('wrongPassword');
+    expect(functions.invoke).not.toHaveBeenCalled();
+    expect(auth.signOut).not.toHaveBeenCalled();
+  });
+
+  it('removes nothing when the password cannot be checked', async () => {
+    auth.signInWithPassword.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { name: 'AuthRetryableFetchError', status: 0 },
+    });
+    expect((await rejection(repo.deleteAccount('correct horse'))).key).toBe('network');
+    expect(functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it('asks for a new sign-in when this phone has none, without checking anything', async () => {
+    auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    expect((await rejection(repo.deleteAccount('correct horse'))).key).toBe('sessionExpired');
+    expect(auth.signInWithPassword).not.toHaveBeenCalled();
+    expect(functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it('does not delete on the strength of a sign-in whose email was never confirmed', async () => {
+    auth.getSession.mockResolvedValue({ data: { session: { user: unconfirmed } }, error: null });
+    expect((await rejection(repo.deleteAccount('correct horse'))).key).toBe('sessionExpired');
+    expect(functions.invoke).not.toHaveBeenCalled();
+  });
+
+  it('fails when the stored sign-in cannot be read', async () => {
+    auth.getSession.mockResolvedValue({
+      data: { session: null },
+      error: { name: 'AuthRetryableFetchError', status: 0 },
+    });
+    expect((await rejection(repo.deleteAccount('correct horse'))).key).toBe('network');
+    expect(functions.invoke).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -149,7 +290,7 @@ describe('deleteAccount', () => {
     'fails with the reason when the function answers %j, and stays signed in',
     async (error, key) => {
       functions.invoke.mockResolvedValue({ data: null, error });
-      expect((await rejection(repo.deleteAccount())).key).toBe(key);
+      expect((await rejection(repo.deleteAccount('correct horse'))).key).toBe(key);
       expect(auth.signOut).not.toHaveBeenCalled();
     },
   );

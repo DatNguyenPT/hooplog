@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/shared/ui/Button';
@@ -8,24 +8,32 @@ import { useTheme } from '@/shared/ui/theme';
 import { useAuthRepository } from '../data/authRepository';
 import type { AccountUser } from '../domain/account';
 import { AccountError, type AccountErrorKey } from '../domain/accountError';
+import { DeleteAccountForm } from './DeleteAccountForm';
+
+type Props = {
+  user: AccountUser;
+  /** Called when the player has deleted their account here, once this phone is signed out. */
+  onDeleted: () => void;
+};
 
 /** Who is signed in, with the two things to do about it: sign out, or delete the account. */
-export function SignedInPanel({ user }: { user: AccountUser }) {
+export function SignedInPanel({ user, onDeleted }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
   const auth = useAuthRepository();
+  const [deleting, setDeleting] = useState(false);
   const [working, setWorking] = useState(false);
   const [failure, setFailure] = useState<AccountErrorKey | null>(null);
   const busy = useRef(false);
 
   // Once it works, the sign-out is announced by the repository and this panel is replaced.
-  const run = async (action: () => Promise<void>) => {
+  const signOut = async () => {
     if (busy.current) return;
     busy.current = true;
     setWorking(true);
     setFailure(null);
     try {
-      await action();
+      await auth.signOut();
     } catch (error) {
       setFailure(error instanceof AccountError ? error.key : 'unknown');
     } finally {
@@ -33,16 +41,6 @@ export function SignedInPanel({ user }: { user: AccountUser }) {
       setWorking(false);
     }
   };
-
-  const confirmDelete = () =>
-    Alert.alert(t('account.deleteTitle'), t('account.deleteBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('account.deleteAccount'),
-        style: 'destructive',
-        onPress: () => void run(() => auth.deleteAccount()),
-      },
-    ]);
 
   return (
     <View style={styles.panel}>
@@ -56,19 +54,28 @@ export function SignedInPanel({ user }: { user: AccountUser }) {
         </Text>
         <Text style={[styles.email, { color: theme.text }]}>{user.email ?? ''}</Text>
       </View>
-      {failure ? <InlineError message={t(`account.error.${failure}`)} /> : null}
-      <Button
-        label={t('account.signOut')}
-        variant="secondary"
-        disabled={working}
-        onPress={() => void run(() => auth.signOut())}
-      />
-      <Button
-        label={t('account.deleteAccount')}
-        variant="missed"
-        disabled={working}
-        onPress={confirmDelete}
-      />
+      {deleting ? (
+        <DeleteAccountForm onCancel={() => setDeleting(false)} onDeleted={onDeleted} />
+      ) : (
+        <>
+          {failure ? <InlineError message={t(`account.error.${failure}`)} /> : null}
+          <Button
+            label={t('account.signOut')}
+            variant="secondary"
+            disabled={working}
+            onPress={() => void signOut()}
+          />
+          <Button
+            label={t('account.deleteAccount')}
+            variant="missed"
+            disabled={working}
+            onPress={() => {
+              setFailure(null);
+              setDeleting(true);
+            }}
+          />
+        </>
+      )}
     </View>
   );
 }

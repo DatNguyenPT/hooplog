@@ -25,7 +25,7 @@ Build in vertical slices, each usable on its own:
 3. Exercise library + workout logging + history - 3 weeks
 4. Training plans + weekly schedule - 2 weeks
 5. Dashboard and analytics (FG% trend, consistency, volume) - 2 weeks
-6. Data export/import, delete-all, polish, accessibility - 1-2 weeks. The owner added swipe-to-go-back and Supabase sign-up/sign-in (accounts only, no sync) to this slice on 2026-11-01 ([ADR 0008](decisions/0008-optional-accounts-supabase-auth.md)); the page the confirmation email lands on is [ADR 0011](decisions/0011-email-confirmation-page.md)
+6. Data export/import, delete-all, polish, accessibility - 1-2 weeks. The owner added swipe-to-go-back and Supabase sign-up/sign-in (accounts only, no sync) to this slice on 2026-11-01 ([ADR 0008](decisions/0008-optional-accounts-supabase-auth.md)); the page the confirmation email lands on is [ADR 0011](decisions/0011-email-confirmation-page.md); the follow-up of 2026-11-02 (unconfirmed accounts cannot sign in, a page per Supabase link, password-checked account deletion) is [ADR 0012](decisions/0012-site-pages-and-account-deletion.md)
 - **Exit:** MVP quality bar in PRODUCT_CONTEXT met; use it yourself for real training for at least 2 weeks.
 
 ### M1.5 Android closed beta: 3-4 weeks
@@ -40,7 +40,7 @@ Runs outside the app first (offline analysis of recorded video), then on a real 
 Camera screen, on-device detector, Uncertain handling, correction UI, session review, analytics split by manual vs AI. Ships behind a feature flag in the beta.
 
 ### M4 Accounts and sync: 4-6 weeks
-Sync, guest-to-account migration and the cloud tables with RLS (designed in [ADR 0009](decisions/0009-cloud-schema.md)). Sign-up, sign-in and account deletion moved into M1 slice 6. Can move earlier or later depending on beta feedback (for example if users lose data).
+Sync, guest-to-account migration and the cloud tables with RLS (designed in [ADR 0009](decisions/0009-cloud-schema.md)). Sign-up, sign-in and account deletion moved into M1 slice 6; before sync starts, the `delete-account` function must check the password (or a very recent sign-in) itself, not only the app ([ADR 0012](decisions/0012-site-pages-and-account-deletion.md)). Can move earlier or later depending on beta feedback (for example if users lose data).
 
 ### M5 Expansion and iOS: open-ended
 Apple Developer account ($99/year), iOS build and testing, Vietnamese, recommendations, advanced analytics, premium split. Public launch decision.

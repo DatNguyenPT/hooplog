@@ -6,107 +6,21 @@
     <!-- Nothing here talks to any server: no fonts, no images, no analytics, no cookies. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; img-src data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <meta name="referrer" content="no-referrer" />
     <meta name="robots" content="noindex" />
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="site.css" />
     <title>HoopLog: email confirmation</title>
-    <style>
-      :root {
-        --background: #ffffff;
-        --surface: #f2f3f5;
-        --text: #111418;
-        --muted: #5b6470;
-        --primary: #c2410c;
-        --made: #1b7a3a;
-        --missed: #b3261e;
-        --on-status: #ffffff;
-        --border: #d9dce1;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --background: #101215;
-          --surface: #1b1e23;
-          --text: #f2f3f5;
-          --muted: #a3abb7;
-          --primary: #ff8a3d;
-          --made: #2fa354;
-          --missed: #e0584f;
-          --border: #2d3138;
-        }
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        min-height: 100dvh;
-        display: grid;
-        place-items: center;
-        padding: 24px 16px;
-        background: var(--background);
-        color: var(--text);
-        font:
-          16px/1.5 system-ui,
-          -apple-system,
-          'Segoe UI',
-          Roboto,
-          sans-serif;
-      }
-      main {
-        width: 100%;
-        max-width: 420px;
-        padding: 32px 24px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        text-align: center;
-      }
-      .brand {
-        margin: 0 0 24px;
-        color: var(--primary);
-        font-size: 14px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .icon {
-        display: block;
-        width: 64px;
-        height: 64px;
-        margin: 0 auto 16px;
-      }
-      .icon circle {
-        fill: var(--made);
-      }
-      .icon.problem circle {
-        fill: var(--missed);
-      }
-      .icon path {
-        fill: none;
-        stroke: var(--on-status);
-        stroke-width: 5;
-        stroke-linecap: round;
-        stroke-linejoin: round;
-      }
-      h1 {
-        margin: 0 0 8px;
-        font-size: 24px;
-        line-height: 1.25;
-      }
-      p {
-        margin: 0;
-        color: var(--muted);
-      }
-      [hidden] {
-        display: none !important;
-      }
-    </style>
   </head>
   <body>
+    <!--
+      The same page as confirm/. Supabase sends a link here when it has no usable redirect address
+      (it falls back to the Site URL), and emails sent before the app asked for confirm/ end up here.
+      pages.test.js keeps the two in step.
+    -->
     <main>
       <p class="brand">HoopLog</p>
 

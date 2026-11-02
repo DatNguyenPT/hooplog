@@ -58,8 +58,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "test": "jest",
     "test:harness": "node --test tools/test",
-    "format": "prettier --write \"src/**/*.{ts,tsx,json}\" \"supabase/functions/**/*.{ts,json}\" \"site/**/*.{html,js}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\" \"supabase/functions/**/*.{ts,json}\" \"site/**/*.{html,js}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx,json}\" \"supabase/functions/**/*.{ts,json}\" \"site/**/*.{html,css,js}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\" \"supabase/functions/**/*.{ts,json}\" \"site/**/*.{html,css,js}\""
   },
   "private": true,
   "jest": {
