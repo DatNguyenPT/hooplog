@@ -25,7 +25,7 @@ Build in vertical slices, each usable on its own:
 3. Exercise library + workout logging + history - 3 weeks
 4. Training plans + weekly schedule - 2 weeks
 5. Dashboard and analytics (FG% trend, consistency, volume) - 2 weeks
-6. Data export/import, delete-all, polish, accessibility - 1-2 weeks. The owner added swipe-to-go-back and Supabase sign-up/sign-in (accounts only, no sync) to this slice on 2026-11-01 ([ADR 0008](decisions/0008-optional-accounts-supabase-auth.md))
+6. Data export/import, delete-all, polish, accessibility - 1-2 weeks. The owner added swipe-to-go-back and Supabase sign-up/sign-in (accounts only, no sync) to this slice on 2026-11-01 ([ADR 0008](decisions/0008-optional-accounts-supabase-auth.md)); the page the confirmation email lands on is [ADR 0011](decisions/0011-email-confirmation-page.md)
 - **Exit:** MVP quality bar in PRODUCT_CONTEXT met; use it yourself for real training for at least 2 weeks.
 
 ### M1.5 Android closed beta: 3-4 weeks

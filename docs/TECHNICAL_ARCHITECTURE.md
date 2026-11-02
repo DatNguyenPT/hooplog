@@ -46,6 +46,7 @@ src/shared/
   ui/                      design system: tokens, Button, Card, EmptyState, ErrorState, Skeleton
   i18n/  units/  utils/
 docs/decisions/            ADRs, one short file per significant decision
+site/                      static web pages published with GitHub Pages (email confirmation page, 0011)
 ```
 
 Features: `training-plans`, `workouts`, `shooting`, `analytics`, `profile`, later `ai-camera`, `sync`.
