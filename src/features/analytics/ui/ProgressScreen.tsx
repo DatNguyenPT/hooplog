@@ -1,10 +1,8 @@
-import { router } from 'expo-router';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button } from '@/shared/ui/Button';
 import { ErrorView, LoadingView } from '@/shared/ui/StateViews';
 import { useTheme } from '@/shared/ui/theme';
 import { useLoad } from '@/shared/ui/useLoad';
@@ -86,7 +84,6 @@ export function ProgressScreen() {
       </Text>
       <PeriodPicker period={period} now={now} onChange={setPeriod} />
       {body}
-      <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
     </SafeAreaView>
   );
 }

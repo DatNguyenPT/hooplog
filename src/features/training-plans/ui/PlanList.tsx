@@ -31,7 +31,6 @@ export function PlanList() {
     return (
       <Screen>
         <ErrorView onRetry={reload} />
-        <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
       </Screen>
     );
 
@@ -65,7 +64,6 @@ export function PlanList() {
           renderItem={({ item }) => <PlanRow plan={item} />}
         />
       )}
-      <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
     </Screen>
   );
 }

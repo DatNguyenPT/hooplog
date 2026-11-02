@@ -98,7 +98,6 @@ export function PlanItemForm({ planId, weekday: weekdayParam, exerciseId, kind }
     return (
       <Screen>
         <EmptyView title={t('plans.notFound')} />
-        <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
       </Screen>
     );
 

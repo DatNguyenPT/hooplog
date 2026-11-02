@@ -10,17 +10,18 @@ const mockRepo: jest.Mocked<ProfileRepository> = {
   saveDisplayName: jest.fn(),
   completeOnboarding: jest.fn(),
 };
-const mockBack = jest.fn();
 
 jest.mock('@/features/profile/data/profileRepository', () => ({
   useProfileRepository: () => mockRepo,
 }));
 
+const mockPush = jest.fn();
+
 jest.mock('expo-router', () => {
   const { useEffect } = jest.requireActual('react');
   return {
-    router: { back: () => mockBack() },
     useFocusEffect: (effect: () => void) => useEffect(effect, [effect]),
+    router: { push: (href: string) => mockPush(href) },
   };
 });
 
@@ -67,6 +68,19 @@ describe('Settings screen', () => {
     expect(screen.queryByText('Saved.')).toBeNull();
   });
 
+  it('offers the optional account and opens it', async () => {
+    await render(<SettingsScreen />);
+    expect(await screen.findByText('Optional. HoopLog works fully without one.')).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Sign in or manage your account'));
+    expect(mockPush).toHaveBeenCalledWith('/account');
+  });
+
+  it('offers the backup, restore and delete screen and opens it', async () => {
+    await render(<SettingsScreen />);
+    await fireEvent.press(await screen.findByLabelText('Back up, restore or delete your data'));
+    expect(mockPush).toHaveBeenCalledWith('/data');
+  });
+
   it('starts with an empty field when no name has been saved', async () => {
     mockRepo.getProfile.mockResolvedValue({ displayName: null, onboardedAt: null });
     await render(<SettingsScreen />);
@@ -78,8 +92,6 @@ describe('Settings screen', () => {
     await render(<SettingsScreen />);
     expect(await screen.findByText('Something went wrong.')).toBeTruthy();
     expect(screen.queryByLabelText(NAME_FIELD)).toBeNull();
-    // Leaving must still work when the profile cannot be read.
-    expect(screen.getByLabelText('Back')).toBeTruthy();
 
     await fireEvent.press(screen.getByLabelText('Try again'));
     expect((await screen.findByLabelText(NAME_FIELD)).props.value).toBe('Dat');
@@ -170,11 +182,5 @@ describe('Settings screen', () => {
     await firstPress;
     expect(await screen.findByText('Saved.')).toBeTruthy();
     expect(screen.getByLabelText('Save name')).not.toBeDisabled();
-  });
-
-  it('goes back', async () => {
-    await render(<SettingsScreen />);
-    await fireEvent.press(await screen.findByLabelText('Back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

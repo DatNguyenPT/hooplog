@@ -78,14 +78,12 @@ export function PlanScreen({ id }: Props) {
     return (
       <Screen>
         <ErrorView onRetry={reload} />
-        <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
       </Screen>
     );
   if (state.data === null)
     return (
       <Screen>
         <EmptyView title={t('plans.notFound')} />
-        <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
       </Screen>
     );
 
@@ -155,7 +153,6 @@ export function PlanScreen({ id }: Props) {
             />
           )}
           <Button label={t('plans.delete')} variant="secondary" onPress={confirmRemove} />
-          <Button label={t('common.back')} variant="secondary" onPress={() => router.back()} />
         </View>
       </ScrollView>
     </Screen>

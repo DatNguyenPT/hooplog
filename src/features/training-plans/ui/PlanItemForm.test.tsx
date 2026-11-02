@@ -377,7 +377,5 @@ describe('PlanItemForm: loading', () => {
     await renderForm(props);
     expect(await screen.findByText('This plan no longer exists.')).toBeTruthy();
     expect(screen.queryByLabelText('Save')).toBeNull();
-    await fireEvent.press(screen.getByLabelText('Back'));
-    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });
