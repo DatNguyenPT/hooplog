@@ -70,7 +70,7 @@ export function PlanNameForm({ initial = '', otherNames, submitLabel, onSubmit, 
           {
             color: theme.text,
             backgroundColor: theme.surface,
-            borderColor: nameError ? theme.missed : theme.border,
+            borderColor: nameError ? theme.missed : theme.fieldBorder,
           },
         ]}
       />

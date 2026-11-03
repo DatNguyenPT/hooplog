@@ -15,17 +15,23 @@ export type AccountState =
  *
  * `deleted` is true from the moment the player deletes their account until someone signs in
  * again, so the sign-in form that follows can say the account is gone.
+ *
+ * `passwordChanged` is true from the moment the player saves a new password until they sign out,
+ * so the signed-in view can say so.
  */
 export function useAccount(): {
   state: AccountState;
   reload: () => void;
   deleted: boolean;
   markDeleted: () => void;
+  passwordChanged: boolean;
+  markPasswordChanged: () => void;
 } {
   const auth = useAuthRepository();
   const [state, setState] = useState<AccountState>({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [deleted, setDeleted] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -33,6 +39,7 @@ export function useAccount(): {
       if (!active) return;
       setState(next);
       if (next.status === 'ready' && next.user) setDeleted(false);
+      if (next.status === 'ready' && !next.user) setPasswordChanged(false);
     };
     auth
       .getUser()
@@ -55,5 +62,7 @@ export function useAccount(): {
 
   const markDeleted = useCallback(() => setDeleted(true), []);
 
-  return { state, reload, deleted, markDeleted };
+  const markPasswordChanged = useCallback(() => setPasswordChanged(true), []);
+
+  return { state, reload, deleted, markDeleted, passwordChanged, markPasswordChanged };
 }

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/shared/ui/Button';
@@ -19,27 +19,21 @@ import {
 } from '../domain/account';
 import { AccountError, type AccountErrorKey } from '../domain/accountError';
 import { AuthField, type AuthInput } from './AuthField';
-import { DeletedNotice } from './DeletedNotice';
+import { CONFIRM_MESSAGES, EMAIL_MESSAGES, PASSWORD_MESSAGES } from './fieldMessages';
+import { LinkButton } from './LinkButton';
+import { Notice } from './Notice';
 import { PasswordRules } from './PasswordRules';
 import { PasswordToggle } from './PasswordToggle';
 
 type Mode = 'signIn' | 'signUp';
 
-const EMAIL_MESSAGES = {
-  required: 'account.fieldError.emailRequired',
-  invalid: 'account.fieldError.emailInvalid',
-} as const;
-const PASSWORD_MESSAGES = {
-  required: 'account.fieldError.passwordRequired',
-  tooShort: 'account.fieldError.passwordTooShort',
-  tooLong: 'account.fieldError.passwordTooLong',
-  needsLetter: 'account.fieldError.passwordNeedsLetter',
-  needsNumber: 'account.fieldError.passwordNeedsNumber',
-} as const;
-const CONFIRM_MESSAGES = {
-  required: 'account.fieldError.confirmRequired',
-  mismatch: 'account.fieldError.confirmMismatch',
-} as const;
+type Props = {
+  deleted?: boolean;
+  /** The email to start with, such as the one typed before a password reset was started. */
+  initialEmail?: string;
+  /** Called when the player asks to reset a forgotten password, with the email typed so far. */
+  onForgotPassword: (email: string) => void;
+};
 
 /**
  * Sign in, or create an account: one form with a switch between the two.
@@ -50,12 +44,12 @@ const CONFIRM_MESSAGES = {
  * `deleted` puts a short "your account was deleted" notice above the form, for the player who has
  * just done that and landed back here.
  */
-export function SignedOutForm({ deleted = false }: { deleted?: boolean }) {
+export function SignedOutForm({ deleted = false, initialEmail = '', onForgotPassword }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
   const auth = useAuthRepository();
   const [mode, setMode] = useState<Mode>('signIn');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -159,7 +153,9 @@ export function SignedOutForm({ deleted = false }: { deleted?: boolean }) {
 
   return (
     <View style={styles.form}>
-      {deleted ? <DeletedNotice /> : null}
+      {deleted ? (
+        <Notice title={t('account.deletedTitle')} body={t('account.deletedBody')} />
+      ) : null}
       <Text accessibilityRole="header" style={[styles.heading, { color: theme.text }]}>
         {signingUp ? t('account.signUpTitle') : t('account.signInTitle')}
       </Text>
@@ -228,16 +224,17 @@ export function SignedOutForm({ deleted = false }: { deleted?: boolean }) {
         onPress={submit}
         disabled={submitting}
       />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={signingUp ? t('account.goToSignIn') : t('account.goToSignUp')}
+      {signingUp ? null : (
+        <LinkButton
+          label={t('account.forgotPassword')}
+          disabled={submitting}
+          onPress={() => onForgotPassword(email)}
+        />
+      )}
+      <LinkButton
+        label={signingUp ? t('account.goToSignIn') : t('account.goToSignUp')}
         onPress={switchMode}
-        style={styles.link}
-      >
-        <Text style={[styles.linkText, { color: theme.primary }]}>
-          {signingUp ? t('account.goToSignIn') : t('account.goToSignUp')}
-        </Text>
-      </Pressable>
+      />
     </View>
   );
 }
@@ -247,6 +244,4 @@ const styles = StyleSheet.create({
   group: { gap: 8 },
   heading: { fontSize: 20, fontWeight: '700' },
   body: { fontSize: 16, lineHeight: 24 },
-  link: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  linkText: { fontSize: 16, fontWeight: '600' },
 });

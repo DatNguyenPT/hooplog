@@ -5,11 +5,14 @@ describe('accountErrorKey', () => {
     ['invalid_credentials', 'invalidCredentials'],
     ['email_not_confirmed', 'emailNotConfirmed'],
     ['weak_password', 'weakPassword'],
+    ['same_password', 'samePassword'],
+    ['otp_expired', 'invalidCode'],
     ['email_address_invalid', 'emailInvalid'],
     ['over_email_send_rate_limit', 'emailRateLimit'],
     ['over_request_rate_limit', 'tooManyRequests'],
     ['signup_disabled', 'signUpDisabled'],
     ['bad_jwt', 'sessionExpired'],
+    ['reauthentication_needed', 'sessionExpired'],
     ['request_timeout', 'network'],
   ])('maps the server code %s to %s', (code, key) => {
     expect(accountErrorKey({ code, status: 400 })).toBe(key);

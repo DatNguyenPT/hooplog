@@ -11,6 +11,8 @@ const light = {
   missed: '#b3261e',
   onStatus: '#ffffff',
   border: '#d9dce1',
+  // The outline of a text field: dark enough to see, 3:1 against the page and against the field.
+  fieldBorder: '#7a828e',
 };
 
 const dark: typeof light = {
@@ -22,11 +24,16 @@ const dark: typeof light = {
   onPrimary: '#101215',
   made: '#2fa354',
   missed: '#e0584f',
-  onStatus: '#ffffff',
+  // Dark text: white on the brighter dark-mode status colours is only 3.2:1 to 3.7:1.
+  onStatus: '#101215',
   border: '#2d3138',
+  fieldBorder: '#69727e',
 };
 
 export type Theme = typeof light;
+
+/** Both palettes by name: `useTheme` picks one, and a test checks their contrast. */
+export const themes = { light, dark };
 
 export function useTheme(): Theme {
   return useColorScheme() === 'dark' ? dark : light;

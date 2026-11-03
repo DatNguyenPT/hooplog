@@ -1,14 +1,24 @@
 import {
   MAX_EMAIL_LENGTH,
   MAX_PASSWORD_BYTES,
+  MAX_RECOVERY_CODE_LENGTH,
   MIN_PASSWORD_LENGTH,
+  MIN_RECOVERY_CODE_LENGTH,
+  RECOVERY_RESEND_SECONDS,
   confirmError,
   emailError,
   newPasswordError,
+  normalizeRecoveryCode,
   passwordChecks,
+  recoveryCodeError,
+  resendWaitSeconds,
   signInPasswordError,
+  validatePasswordChange,
+  validateRecovery,
   validateSignIn,
   validateSignUp,
+  type PasswordChangeForm,
+  type RecoveryForm,
   type SignUpForm,
 } from './account';
 
@@ -196,5 +206,183 @@ describe('signInPasswordError', () => {
   it('only asks for a password to be there', () => {
     expect(signInPasswordError('')).toBe('required');
     expect(signInPasswordError('a')).toBeUndefined();
+  });
+});
+
+describe('normalizeRecoveryCode', () => {
+  it('drops the spaces a mail app or a keyboard may add, non-breaking ones and tabs included', () => {
+    expect(normalizeRecoveryCode(' 123 456 ')).toBe('123456');
+    expect(normalizeRecoveryCode('123 456\t')).toBe('123456');
+  });
+
+  it('leaves everything else alone, so the check can still refuse it', () => {
+    expect(normalizeRecoveryCode('12-3456')).toBe('12-3456');
+  });
+});
+
+describe('recoveryCodeError', () => {
+  it('asks for the code when it is empty or only spaces', () => {
+    expect(recoveryCodeError('')).toBe('required');
+    expect(recoveryCodeError('   ')).toBe('required');
+  });
+
+  it.each([
+    '123456',
+    '123 456',
+    ' 123456 ',
+    '0'.repeat(MIN_RECOVERY_CODE_LENGTH),
+    '9'.repeat(MAX_RECOVERY_CODE_LENGTH),
+  ])('accepts %j', (raw) => {
+    expect(recoveryCodeError(raw)).toBeUndefined();
+  });
+
+  it.each([
+    '12345',
+    '1'.repeat(MAX_RECOVERY_CODE_LENGTH + 1),
+    '12345a',
+    'abcdef',
+    '12-3456',
+    // Digits from other scripts look right on screen but are not what the email holds.
+    '１２３４５６',
+    '١٢٣٤٥٦',
+  ])('rejects %j', (raw) => {
+    expect(recoveryCodeError(raw)).toBe('invalid');
+  });
+});
+
+describe('validateRecovery', () => {
+  const code = '123456';
+  const recovery = (overrides: Partial<RecoveryForm> = {}) =>
+    validateRecovery({ email, code, password: strong, confirmPassword: strong, ...overrides });
+
+  it('accepts an email, the code and a good new password typed twice, and sends on only the three', () => {
+    expect(recovery()).toEqual({ ok: true, value: { email, code, password: strong } });
+  });
+
+  it('trims the email, drops the spaces in the code and leaves the password exactly as typed', () => {
+    const spaced = ` ${strong} `;
+    expect(
+      recovery({
+        email: '  dat@example.com \n',
+        code: '123 456',
+        password: spaced,
+        confirmPassword: spaced,
+      }),
+    ).toEqual({ ok: true, value: { email, code, password: spaced } });
+  });
+
+  it('asks for everything when the form is empty', () => {
+    expect(recovery({ email: ' ', code: '', password: '', confirmPassword: '' })).toEqual({
+      ok: false,
+      errors: {
+        email: 'required',
+        code: 'required',
+        password: 'required',
+        confirmPassword: 'required',
+      },
+    });
+  });
+
+  it('points at the one field that is wrong', () => {
+    expect(recovery({ email: 'dat@' })).toEqual({ ok: false, errors: { email: 'invalid' } });
+    expect(recovery({ code: '12345' })).toEqual({ ok: false, errors: { code: 'invalid' } });
+    expect(recovery({ password: 'a1', confirmPassword: 'a1' })).toEqual({
+      ok: false,
+      errors: { password: 'tooShort' },
+    });
+    expect(recovery({ confirmPassword: `${strong}x` })).toEqual({
+      ok: false,
+      errors: { confirmPassword: 'mismatch' },
+    });
+  });
+});
+
+describe('resendWaitSeconds', () => {
+  const sentAt = 1_000_000;
+
+  it('starts at the full wait and counts down in whole seconds', () => {
+    expect(resendWaitSeconds(sentAt, sentAt)).toBe(RECOVERY_RESEND_SECONDS);
+    expect(resendWaitSeconds(sentAt, sentAt + 1_500)).toBe(RECOVERY_RESEND_SECONDS - 1);
+    expect(resendWaitSeconds(sentAt, sentAt + 59_000)).toBe(1);
+  });
+
+  it('is 0 once the minute is over, and stays 0', () => {
+    expect(resendWaitSeconds(sentAt, sentAt + 60_000)).toBe(0);
+    expect(resendWaitSeconds(sentAt, sentAt + 3_600_000)).toBe(0);
+  });
+
+  it('never waits longer than the minute, even when the clock was set back', () => {
+    expect(resendWaitSeconds(sentAt, sentAt - 5_000)).toBe(RECOVERY_RESEND_SECONDS);
+  });
+});
+
+describe('validatePasswordChange', () => {
+  const current = 'old password 1';
+  const change = (overrides: Partial<PasswordChangeForm> = {}) =>
+    validatePasswordChange({
+      currentPassword: current,
+      newPassword: strong,
+      confirmPassword: strong,
+      ...overrides,
+    });
+
+  it('accepts the current password and a good new one typed twice, and sends on only the two', () => {
+    expect(change()).toEqual({
+      ok: true,
+      value: { currentPassword: current, newPassword: strong },
+    });
+  });
+
+  it('takes any current password, so an account made under older rules can still change it', () => {
+    expect(change({ currentPassword: 'abc' }).ok).toBe(true);
+  });
+
+  it('leaves both passwords exactly as typed', () => {
+    const spaced = ` ${strong} `;
+    expect(
+      change({ currentPassword: ' abc ', newPassword: spaced, confirmPassword: spaced }),
+    ).toEqual({
+      ok: true,
+      value: { currentPassword: ' abc ', newPassword: spaced },
+    });
+  });
+
+  it('asks for all three when the form is empty', () => {
+    expect(change({ currentPassword: '', newPassword: '', confirmPassword: '' })).toEqual({
+      ok: false,
+      errors: {
+        currentPassword: 'required',
+        newPassword: 'required',
+        confirmPassword: 'required',
+      },
+    });
+  });
+
+  it('holds the new password to the sign-up rules', () => {
+    expect(change({ newPassword: 'a1', confirmPassword: 'a1' })).toEqual({
+      ok: false,
+      errors: { newPassword: 'tooShort' },
+    });
+  });
+
+  it('refuses a new password that is the current one', () => {
+    expect(change({ currentPassword: strong })).toEqual({
+      ok: false,
+      errors: { newPassword: 'sameAsCurrent' },
+    });
+  });
+
+  it('names the broken rule, not "same as current", when the new password is also too weak', () => {
+    expect(change({ currentPassword: 'abc', newPassword: 'abc', confirmPassword: 'abc' })).toEqual({
+      ok: false,
+      errors: { newPassword: 'tooShort' },
+    });
+  });
+
+  it('asks for the confirmation to match the new password', () => {
+    expect(change({ confirmPassword: `${strong}x` })).toEqual({
+      ok: false,
+      errors: { confirmPassword: 'mismatch' },
+    });
   });
 });

@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import * as SystemUI from 'expo-system-ui';
 import { Suspense, useEffect } from 'react';
 import { ActivityIndicator, Platform } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 import '@/shared/i18n';
 import { DatabaseProvider } from '@/shared/db/DatabaseProvider';
@@ -9,6 +10,7 @@ import { EdgeSwipeBack } from '@/shared/ui/EdgeSwipeBack';
 import { useTheme } from '@/shared/ui/theme';
 
 export default function RootLayout() {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   // The window itself keeps a default light colour. It shows through while one screen slides over
@@ -18,7 +20,7 @@ export default function RootLayout() {
   }, [theme.background]);
 
   return (
-    <Suspense fallback={<ActivityIndicator accessibilityLabel="Loading" />}>
+    <Suspense fallback={<ActivityIndicator accessibilityLabel={t('common.loading')} />}>
       <DatabaseProvider>
         {/* iOS already swipes back from the left edge natively; Android has no such gesture here. */}
         <EdgeSwipeBack enabled={Platform.OS === 'android'}>

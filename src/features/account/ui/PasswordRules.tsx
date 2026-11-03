@@ -41,6 +41,6 @@ export function PasswordRules({ password }: { password: string }) {
 const styles = StyleSheet.create({
   list: { gap: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mark: { width: 16, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  mark: { minWidth: 16, fontSize: 14, fontWeight: '700', textAlign: 'center' },
   text: { fontSize: 14 },
 });

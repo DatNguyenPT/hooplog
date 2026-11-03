@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   name: { width: 112, fontSize: 15 },
   track: { flex: 1, height: 14, justifyContent: 'center' },
   bar: { height: 14, borderTopRightRadius: 4, borderBottomRightRadius: 4 },
-  count: { width: 28, textAlign: 'right', fontSize: 15, fontWeight: '700' },
+  count: { minWidth: 28, textAlign: 'right', fontSize: 15, fontWeight: '700' },
   setTrack: { height: 6, marginTop: 4 },
   setBar: { height: 6, borderTopRightRadius: 4, borderBottomRightRadius: 4 },
 });
