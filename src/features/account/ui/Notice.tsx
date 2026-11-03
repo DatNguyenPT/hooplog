@@ -1,11 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
 
 import { useTheme } from '@/shared/ui/theme';
 
-/** Shown above the sign-in form right after an account was deleted, so the player knows it worked. */
-export function DeletedNotice() {
-  const { t } = useTranslation();
+/** A short confirmation that something worked, announced by screen readers when it appears. */
+export function Notice({ title, body }: { title: string; body: string }) {
   const theme = useTheme();
   return (
     <View
@@ -13,9 +11,9 @@ export function DeletedNotice() {
       style={[styles.card, { backgroundColor: theme.surface }]}
     >
       <Text accessibilityRole="header" style={[styles.title, { color: theme.text }]}>
-        {t('account.deletedTitle')}
+        {title}
       </Text>
-      <Text style={[styles.body, { color: theme.textMuted }]}>{t('account.deletedBody')}</Text>
+      <Text style={[styles.body, { color: theme.textMuted }]}>{body}</Text>
     </View>
   );
 }

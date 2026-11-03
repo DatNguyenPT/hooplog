@@ -221,7 +221,7 @@ function ItemFields({
             {
               color: theme.text,
               backgroundColor: theme.surface,
-              borderColor: error ? theme.missed : theme.border,
+              borderColor: error ? theme.missed : theme.fieldBorder,
             },
           ]}
         />

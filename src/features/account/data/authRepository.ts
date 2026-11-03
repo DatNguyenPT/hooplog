@@ -1,7 +1,13 @@
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
 
 import { getSupabase } from '@/shared/supabase/client';
-import type { AccountUser, Credentials, SignUpOutcome } from '../domain/account';
+import type {
+  AccountUser,
+  Credentials,
+  PasswordChange,
+  Recovery,
+  SignUpOutcome,
+} from '../domain/account';
 import { AccountError, accountErrorKey, type FailureLike } from '../domain/accountError';
 import { confirmationUrl } from '../domain/accountLinks';
 
@@ -22,6 +28,19 @@ export interface AuthRepository {
    * password is asked for again first, so a stray tap on an unlocked phone cannot erase it.
    */
   deleteAccount(password: string): Promise<void>;
+  /**
+   * Mails a code for choosing a new password. Supabase answers the same whether or not the address
+   * has an account, so this never tells. It accepts one request per address a minute.
+   */
+  sendRecoveryCode(email: string): Promise<void>;
+  /**
+   * Finishes a reset: the code from the email proves the address, then the new password is saved
+   * and the player is signed in. Supabase spends the code as soon as it is right, so if saving the
+   * password then fails, the sign-in the code started is dropped again and a new code is needed.
+   */
+  completeRecovery(recovery: Recovery): Promise<void>;
+  /** Changes the password of the signed-in player. The current one is asked for again first. */
+  changePassword(change: PasswordChange): Promise<void>;
 }
 
 /**
@@ -39,7 +58,7 @@ const userOf = (session: Session | null): AccountUser | null =>
 
 const failure = (error: FailureLike) => new AccountError(accountErrorKey(error), { cause: error });
 
-/** Checking the password again before a deletion: "email and password do not match" is a wrong password. */
+/** Checking the password again before a change or a deletion: "email and password do not match" is a wrong password. */
 function passwordFailure(error: FailureLike): AccountError {
   const key = accountErrorKey(error);
   return new AccountError(key === 'invalidCredentials' ? 'wrongPassword' : key, { cause: error });
@@ -55,6 +74,19 @@ function functionFailure(error: { name: string; context?: unknown }): AccountErr
 async function dropSession(supabase: SupabaseClient): Promise<void> {
   const { error } = await supabase.auth.signOut({ scope: 'local' });
   if (error) throw failure(error);
+}
+
+/**
+ * Signs in again with the password the player typed, which proves it is theirs. The email comes
+ * from the stored sign-in, so with none (or an unconfirmed one) the player has to sign in first.
+ */
+async function proveCurrentPassword(supabase: SupabaseClient, password: string): Promise<void> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw failure(error);
+  const email = userOf(data.session)?.email;
+  if (!email) throw new AccountError('sessionExpired');
+  const proof = await supabase.auth.signInWithPassword({ email, password });
+  if (proof.error) throw passwordFailure(proof.error);
 }
 
 /**
@@ -125,19 +157,40 @@ export function createAuthRepository(
 
     async deleteAccount(password) {
       const supabase = client();
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw failure(error);
-      const email = userOf(data.session)?.email;
-      if (!email) throw new AccountError('sessionExpired');
-      // Signing in again proves the password. Nothing is removed unless it is right.
-      const proof = await supabase.auth.signInWithPassword({ email, password });
-      if (proof.error) throw passwordFailure(proof.error);
-      const { error: removalError } = await supabase.functions.invoke('delete-account', {
-        method: 'POST',
-      });
-      if (removalError) throw functionFailure(removalError);
+      // Nothing is removed unless the password is right.
+      await proveCurrentPassword(supabase, password);
+      const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+      if (error) throw functionFailure(error);
       // The server has already ended the sign-in; this clears what is left on the phone.
       await dropSession(supabase);
+    },
+
+    async sendRecoveryCode(email) {
+      const { error } = await client().auth.resetPasswordForEmail(email);
+      if (error) throw failure(error);
+    },
+
+    async completeRecovery({ email, code, password }) {
+      const supabase = client();
+      // Supabase spends the code as soon as it is right, and starts a sign-in with it.
+      const verified = await supabase.auth.verifyOtp({ email, token: code, type: 'recovery' });
+      if (verified.error) throw failure(verified.error);
+      const { error } = await supabase.auth.updateUser({ password });
+      // The same password as before leaves the player signed in with exactly what they typed.
+      if (error && accountErrorKey(error) !== 'samePassword') {
+        // Do not leave a sign-in behind that never got a new password. If signing out fails too
+        // (no connection), it stays until the player signs out and asks for a new code.
+        await dropSession(supabase).catch(() => undefined);
+        throw failure(error);
+      }
+    },
+
+    async changePassword({ currentPassword, newPassword }) {
+      const supabase = client();
+      // Nothing is changed unless the current password is right.
+      await proveCurrentPassword(supabase, currentPassword);
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw failure(error);
     },
   };
 }

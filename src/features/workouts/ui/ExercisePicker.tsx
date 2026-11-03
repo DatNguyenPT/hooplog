@@ -119,7 +119,7 @@ export function ExercisePicker({ sessionId, onChoose }: Props) {
         returnKeyType="search"
         style={[
           styles.input,
-          { color: theme.text, backgroundColor: theme.surface, borderColor: theme.border },
+          { color: theme.text, backgroundColor: theme.surface, borderColor: theme.fieldBorder },
         ]}
       />
       <Button label={t('picker.create')} variant="secondary" onPress={() => setCreating(true)} />
@@ -230,7 +230,7 @@ function CreateExercise({
           {
             color: theme.text,
             backgroundColor: theme.surface,
-            borderColor: nameError ? theme.missed : theme.border,
+            borderColor: nameError ? theme.missed : theme.fieldBorder,
           },
         ]}
       />

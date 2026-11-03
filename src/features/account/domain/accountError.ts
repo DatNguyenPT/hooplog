@@ -5,6 +5,8 @@ export type AccountErrorKey =
   | 'emailNotConfirmed'
   | 'cannotCreate'
   | 'weakPassword'
+  | 'samePassword'
+  | 'invalidCode'
   | 'emailInvalid'
   | 'emailRateLimit'
   | 'tooManyRequests'
@@ -25,11 +27,15 @@ const BY_CODE = new Map<string, AccountErrorKey>([
   ['user_already_exists', 'cannotCreate'],
   ['email_exists', 'cannotCreate'],
   ['weak_password', 'weakPassword'],
+  ['same_password', 'samePassword'],
+  // Supabase answers a wrong code and an expired one the same way, so the message covers both.
+  ['otp_expired', 'invalidCode'],
   ['email_address_invalid', 'emailInvalid'],
   ['over_email_send_rate_limit', 'emailRateLimit'],
   ['over_request_rate_limit', 'tooManyRequests'],
   ['signup_disabled', 'signUpDisabled'],
   ['bad_jwt', 'sessionExpired'],
+  ['reauthentication_needed', 'sessionExpired'],
   ['session_expired', 'sessionExpired'],
   ['session_not_found', 'sessionExpired'],
   ['request_timeout', 'network'],

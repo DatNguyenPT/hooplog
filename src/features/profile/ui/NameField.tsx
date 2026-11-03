@@ -36,7 +36,7 @@ export function NameField({ label, hint, value, onChangeText, onSubmit, error }:
           {
             color: theme.text,
             backgroundColor: theme.surface,
-            borderColor: error ? theme.missed : theme.border,
+            borderColor: error ? theme.missed : theme.fieldBorder,
           },
         ]}
       />

@@ -105,5 +105,89 @@ export function validateSignIn(raw: Credentials): CredentialsCheck {
     : { ok: true, value: { email: raw.email.trim(), password: raw.password } };
 }
 
+/** The reset email holds a code of this many digits at least (6 by default). */
+export const MIN_RECOVERY_CODE_LENGTH = 6;
+/** Supabase lets the project owner lengthen the code, so a longer one must not be refused. */
+export const MAX_RECOVERY_CODE_LENGTH = 10;
+/** Supabase accepts one reset request per address per minute. */
+export const RECOVERY_RESEND_SECONDS = 60;
+
+export type CodeError = 'required' | 'invalid';
+
+/** What finishes a reset: the address, the code from the email and the new password. */
+export type Recovery = { email: string; code: string; password: string };
+export type RecoveryForm = Recovery & { confirmPassword: string };
+export type RecoveryErrors = {
+  email?: EmailError;
+  code?: CodeError;
+  password?: PasswordError;
+  confirmPassword?: ConfirmError;
+};
+export type RecoveryCheck = { ok: true; value: Recovery } | { ok: false; errors: RecoveryErrors };
+
+/** A code is copied from an email, so the spaces a mail app may add or a keyboard may suggest are dropped. */
+export const normalizeRecoveryCode = (raw: string): string => raw.replace(/\s+/g, '');
+
+/** Why a reset code cannot be right, if it cannot. Only the shape is checked; Supabase checks the value. */
+export function recoveryCodeError(raw: string): CodeError | undefined {
+  const code = normalizeRecoveryCode(raw);
+  if (code === '') return 'required';
+  const shapeOk =
+    /^[0-9]+$/.test(code) &&
+    code.length >= MIN_RECOVERY_CODE_LENGTH &&
+    code.length <= MAX_RECOVERY_CODE_LENGTH;
+  return shapeOk ? undefined : 'invalid';
+}
+
+/** Checks the reset form: a valid email, the code, and a new password that meets the rules, typed twice. */
+export function validateRecovery(raw: RecoveryForm): RecoveryCheck {
+  const errors: RecoveryErrors = {
+    email: emailError(raw.email),
+    code: recoveryCodeError(raw.code),
+    password: newPasswordError(raw.password),
+    confirmPassword: confirmError(raw.password, raw.confirmPassword),
+  };
+  return Object.values(errors).some((problem) => problem !== undefined)
+    ? { ok: false, errors }
+    : {
+        ok: true,
+        value: {
+          email: raw.email.trim(),
+          code: normalizeRecoveryCode(raw.code),
+          password: raw.password,
+        },
+      };
+}
+
+/** Whole seconds left before another code may be requested; 0 when the wait is over. */
+export function resendWaitSeconds(sentAt: number, now: number): number {
+  const elapsed = Math.floor((now - sentAt) / 1000);
+  return Math.min(RECOVERY_RESEND_SECONDS, Math.max(0, RECOVERY_RESEND_SECONDS - elapsed));
+}
+
+/** What changes a password while signed in: the one in use now proves it is the player, then the new one. */
+export type PasswordChange = { currentPassword: string; newPassword: string };
+export type PasswordChangeForm = PasswordChange & { confirmPassword: string };
+export type PasswordChangeErrors = {
+  currentPassword?: PasswordError;
+  newPassword?: PasswordError | 'sameAsCurrent';
+  confirmPassword?: ConfirmError;
+};
+export type PasswordChangeCheck =
+  { ok: true; value: PasswordChange } | { ok: false; errors: PasswordChangeErrors };
+
+/** Checks the change-password form. The current password only has to be there: it may predate today's rules. */
+export function validatePasswordChange(raw: PasswordChangeForm): PasswordChangeCheck {
+  const rules = newPasswordError(raw.newPassword);
+  const errors: PasswordChangeErrors = {
+    currentPassword: signInPasswordError(raw.currentPassword),
+    newPassword: rules ?? (raw.newPassword === raw.currentPassword ? 'sameAsCurrent' : undefined),
+    confirmPassword: confirmError(raw.newPassword, raw.confirmPassword),
+  };
+  return Object.values(errors).some((problem) => problem !== undefined)
+    ? { ok: false, errors }
+    : { ok: true, value: { currentPassword: raw.currentPassword, newPassword: raw.newPassword } };
+}
+
 /** What `signUp` did: the project may or may not require the email to be confirmed first. */
 export type SignUpOutcome = 'confirmationSent' | 'signedIn';

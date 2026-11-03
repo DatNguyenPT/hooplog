@@ -14,6 +14,9 @@ const mockRepo: jest.Mocked<AuthRepository> = {
   signIn: jest.fn(),
   signOut: jest.fn(),
   deleteAccount: jest.fn(),
+  sendRecoveryCode: jest.fn(),
+  completeRecovery: jest.fn(),
+  changePassword: jest.fn(),
 };
 
 jest.mock('@/features/account/data/authRepository', () => ({
@@ -54,6 +57,9 @@ beforeEach(() => {
   mockRepo.signIn.mockResolvedValue(undefined);
   mockRepo.signOut.mockResolvedValue(undefined);
   mockRepo.deleteAccount.mockResolvedValue(undefined);
+  mockRepo.sendRecoveryCode.mockResolvedValue(undefined);
+  mockRepo.completeRecovery.mockResolvedValue(undefined);
+  mockRepo.changePassword.mockResolvedValue(undefined);
 });
 
 afterEach(() => jest.restoreAllMocks());

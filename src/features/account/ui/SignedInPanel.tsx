@@ -8,20 +8,29 @@ import { useTheme } from '@/shared/ui/theme';
 import { useAuthRepository } from '../data/authRepository';
 import type { AccountUser } from '../domain/account';
 import { AccountError, type AccountErrorKey } from '../domain/accountError';
+import { ChangePasswordForm } from './ChangePasswordForm';
 import { DeleteAccountForm } from './DeleteAccountForm';
+import { Notice } from './Notice';
 
 type Props = {
   user: AccountUser;
+  /** True once the password was changed in this visit, until the player signs out. */
+  passwordChanged: boolean;
+  /** Called when the player has changed their password here. */
+  onPasswordChanged: () => void;
   /** Called when the player has deleted their account here, once this phone is signed out. */
   onDeleted: () => void;
 };
 
-/** Who is signed in, with the two things to do about it: sign out, or delete the account. */
-export function SignedInPanel({ user, onDeleted }: Props) {
+/**
+ * Who is signed in, with what to do about it: change the password, sign out, or delete the
+ * account.
+ */
+export function SignedInPanel({ user, passwordChanged, onPasswordChanged, onDeleted }: Props) {
   const { t } = useTranslation();
   const theme = useTheme();
   const auth = useAuthRepository();
-  const [deleting, setDeleting] = useState(false);
+  const [mode, setMode] = useState<'idle' | 'changePassword' | 'delete'>('idle');
   const [working, setWorking] = useState(false);
   const [failure, setFailure] = useState<AccountErrorKey | null>(null);
   const busy = useRef(false);
@@ -54,11 +63,36 @@ export function SignedInPanel({ user, onDeleted }: Props) {
         </Text>
         <Text style={[styles.email, { color: theme.text }]}>{user.email ?? ''}</Text>
       </View>
-      {deleting ? (
-        <DeleteAccountForm onCancel={() => setDeleting(false)} onDeleted={onDeleted} />
-      ) : (
+      {mode === 'changePassword' ? (
+        <ChangePasswordForm
+          onCancel={() => setMode('idle')}
+          onChanged={() => {
+            onPasswordChanged();
+            setMode('idle');
+          }}
+        />
+      ) : null}
+      {mode === 'delete' ? (
+        <DeleteAccountForm onCancel={() => setMode('idle')} onDeleted={onDeleted} />
+      ) : null}
+      {mode === 'idle' ? (
         <>
+          {passwordChanged ? (
+            <Notice
+              title={t('account.passwordChangedTitle')}
+              body={t('account.passwordChangedBody')}
+            />
+          ) : null}
           {failure ? <InlineError message={t(`account.error.${failure}`)} /> : null}
+          <Button
+            label={t('account.changePassword')}
+            variant="secondary"
+            disabled={working}
+            onPress={() => {
+              setFailure(null);
+              setMode('changePassword');
+            }}
+          />
           <Button
             label={t('account.signOut')}
             variant="secondary"
@@ -71,11 +105,11 @@ export function SignedInPanel({ user, onDeleted }: Props) {
             disabled={working}
             onPress={() => {
               setFailure(null);
-              setDeleting(true);
+              setMode('delete');
             }}
           />
         </>
-      )}
+      ) : null}
     </View>
   );
 }

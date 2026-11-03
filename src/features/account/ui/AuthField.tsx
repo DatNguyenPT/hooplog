@@ -25,7 +25,7 @@ export function AuthField({ label, error, inputRef, trailing, ...input }: Props)
       <View
         style={[
           styles.box,
-          { backgroundColor: theme.surface, borderColor: error ? theme.missed : theme.border },
+          { backgroundColor: theme.surface, borderColor: error ? theme.missed : theme.fieldBorder },
         ]}
       >
         <TextInput

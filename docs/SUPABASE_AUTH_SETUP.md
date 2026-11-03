@@ -1,6 +1,6 @@
 # Supabase setup: the owner's checklist
 
-These are the things only the project owner can do in the Supabase dashboard, or approve in chat. Nothing here has been applied: no setting, table or function on the live project was changed by the code in this repository. Dashboard menus get renamed from time to time; if one is missing, search the dashboard for its words.
+These are the things only the project owner can do in the Supabase dashboard, or approve in chat. Apart from the `delete-account` function (section 4, deployed on 2026-11-03), nothing here has been applied: no setting or table on the live project was changed by the code in this repository. Dashboard menus get renamed from time to time; if one is missing, search the dashboard for its words.
 
 The pages mentioned below are published by GitHub Pages from the `site/` folder once a change reaches `main`. Do the dashboard steps after the pull request that adds the pages has been merged and the "Pages" workflow has finished (see [0012](decisions/0012-site-pages-and-account-deletion.md)).
 
@@ -34,11 +34,11 @@ Dashboard: Authentication, Emails, SMTP Settings.
 
 Supabase's built-in sender only mails addresses that belong to your project team and allows about 2 emails an hour, so ordinary players never receive the confirmation link. Before a closed beta, add an SMTP provider and a sender address on a domain you control (see [0008](decisions/0008-optional-accounts-supabase-auth.md)). Until then only you and your team can sign up.
 
-## 4. Deploy the `delete-account` function
+## 4. The `delete-account` function
 
-The function is written and tested (`supabase/functions/delete-account/`) but not deployed. Until it is, "Delete account" in the app answers "This is not available yet. Please try again later."
+The function (`supabase/functions/delete-account/`) was deployed on 2026-11-03 (version 1, login check on). Only its front door was tested: a call without a login answers 401. Whether the code behind it works is shown by one real round trip (the last bullet below).
 
-- Ask Claude Code to deploy it. It needs your yes in chat first, and the Supabase connection signed in through `/mcp` (or the Supabase command line logged in).
+- To deploy a changed version, ask Claude Code. It needs your yes in chat first, and the Supabase connection signed in through `/mcp` (or the Supabase command line logged in).
 - Or do it yourself:
 
   ```bash
@@ -50,7 +50,31 @@ The function is written and tested (`supabase/functions/delete-account/`) but no
 - It needs no secret from you: Supabase hands the function its own key.
 - Test it with a throwaway account: sign up, confirm, sign in, then Settings, Account, Delete account. A wrong password should change nothing. The right one should show "Account deleted" and the user should disappear from the Users list.
 
-## 5. Still waiting for your decision
+## 5. Make the password reset email show a code
+
+Needed for "Forgot password?" in the app ([0013](decisions/0013-password-recovery-by-emailed-code.md)). The player types the code from the email into the app, so the email must contain it.
+
+First check that you can edit the template. Dashboard: Authentication, Emails, Templates, "Reset password". Since 2026-06-03, new Free-plan projects that use Supabase's built-in sender cannot edit email templates ("existing projects keep theirs"). If the template is locked or will not save, stop and tell Claude Code. The options are then your own email sender (section 3, pulled forward) or a link-based reset (a bigger change).
+
+If you can edit it:
+1. Set the subject to `Your HoopLog password reset code`.
+2. Replace the message body with the text below. Do not keep the `{{ .ConfirmationURL }}` link: a mail scanner that opens the link would use up the code.
+
+   ```html
+   <h2>Reset your HoopLog password</h2>
+   <p>Type this code in the app:</p>
+   <p style="font-size: 24px; letter-spacing: 4px"><strong>{{ .Token }}</strong></p>
+   <p>The code works for a short time. If you did not ask for it, ignore this email.</p>
+   ```
+
+3. Save. Change nothing else.
+
+Good to know:
+- The code has 6 digits by default. The app accepts 6 to 10 digits, in case that is ever changed. How long it works is the "Email OTP Expiration" setting (Authentication, Sign In / Providers, Email).
+- Supabase sends one reset email per address every 60 seconds. The built-in sender allows only about 2 emails an hour and mails only your project team, so test with an address of yours that is on the team, and do not try many times in a row.
+- To test: sign out, tap "Forgot password?", type your address, tap "Send code", read the email, type the code and a new password. You should end up signed in with a "Your password was changed" notice. Then sign out and sign in with the new password.
+
+## 6. Still waiting for your decision
 
 - The cloud tables designed in [0009](decisions/0009-cloud-schema.md) are five migration files in `supabase/migrations/`. They are not applied. Nothing in the app needs them until sync (M4), so applying them can wait.
 - Before real players: a contact address for deletion requests made without the app (Google Play asks for one). Tell Claude Code which address to publish on `delete-account/`; it will not invent one.
